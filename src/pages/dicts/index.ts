@@ -1,0 +1,1 @@
+export { DictsPage } from "./DictsPage";

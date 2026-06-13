@@ -1,0 +1,304 @@
+
+############################
+# 基础依赖 / 包管理器
+############################
+node_modules/
+jspm_packages/
+bower_components/
+
+# pnpm
+.pnpm-store/
+.pnpm-debug.log*
+
+# yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.yarnrc.yml
+
+# npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+############################
+# 日志
+############################
+logs
+*.log
+
+############################
+# 运行时与进程文件
+############################
+pids
+*.pid
+*.seed
+*.pid.lock
+
+############################
+# 构建产物 / 打包输出
+############################
+
+dist-ssr/
+build/
+out/
+.output/          # Nuxt 3
+.nuxt/            # Nuxt 2/3
+.nitro/           # Nuxt 3 nitro
+.cache/           # 多种工具通用缓存目录（如 webpack/rollup 等的部分插件）
+
+# VuePress / VitePress / Docs
+docs/.vuepress/dist/
+docs/.vitepress/dist/
+.vitepress/dist/
+
+# 历史计划与审查记录（本地保留，不随开源仓库发布）
+docs/plans/**
+docs/review/**
+
+############################
+# Vite / Webpack / Rollup / Parcel 缓存
+############################
+# Vite
+.vite/
+
+# Webpack
+.cache/
+webpack-stats.json
+
+# Parcel
+.parcel-cache/
+
+# Rollup（部分插件会生成）
+.rollup.cache/
+
+############################
+# TypeScript / Babel / ESLint / Stylelint 缓存
+############################
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+.babelcache/
+.swc/
+.swc_cache/
+
+############################
+# 测试 / 覆盖率 / 报告
+############################
+coverage/
+.nyc_output/
+test-results/
+junit.xml
+playwright-report/
+blob-report/
+cypress/videos/
+cypress/screenshots/
+reports/
+allure-results/
+allure-report/
+
+############################
+# Storybook / 可视化测试
+############################
+storybook-static/
+.chromatic/
+
+############################
+# 本地环境变量 / 私密配置
+############################
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# 可能的本地配置文件（按需保留/删除）
+*.local
+*.local.*
+
+############################
+# SSR / 框架特定
+############################
+# Nuxt 2
+.nuxt/
+
+# Quasar（如使用）
+.quasar/
+.quasar-cache/
+.quasar.conf.js.*.local
+
+# Electron（如使用）
+dist_electron/
+release/
+
+############################
+# 开发工具 / IDE
+############################
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# JetBrains/IntelliJ 系列
+.idea_modules/
+atlassian-ide-plugin.xml
+
+############################
+# 操作系统杂项
+############################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+############################
+# 本地证书 / key / 临时文件
+############################
+*.pem
+*.key
+*.crt
+*.p12
+
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+
+############################
+# 运行产物 / 本地持久化（按需）
+############################
+# 例如本地 sqlite、数据导出等（不需要可删）
+*.sqlite
+*.db
+
+############################
+# 部署平台（可选）
+############################
+.vercel/
+.netlify/
+.firebase/
+.serverless/
+.sst/
+.turbo/
+.next/            # 如果你混用 Next.js
+
+
+
+# =========================
+# Java / Spring Boot
+# =========================
+*.class
+*.jar
+*.war
+*.ear
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+# =========================
+# Maven
+# =========================
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+.buildNumber
+.mvn/timing.properties
+
+# Maven Wrapper
+.mvn/wrapper/maven-wrapper.jar
+
+# =========================
+# Gradle
+# =========================
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# =========================
+# Spring Boot / App runtime
+# =========================
+# If you generate files to local dirs
+logs/
+
+# Spring profile configs (按需开启)
+# application-*.yml
+# application-*.yaml
+# application-*.properties
+
+
+# =========================
+# IDE: Eclipse / STS
+# =========================
+.classpath
+.project
+.settings/
+.springBeans
+.factorypath
+
+# =========================
+# Lombok (如果使用 lombok.config 且想提交就删掉这一行)
+# =========================
+# lombok.config
+
+# =========================
+# Test / Coverage
+# =========================
+# JaCoCo
+jacoco.exec
+jacoco*.exec
+**/jacoco*.exec
+
+# IntelliJ coverage
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/shelf/
+
+
+# =========================
+# Secret files (强烈建议)
+# =========================
+*.keystore
+*.jks
+*.pfx
+# Logs
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+
+# Editor directories and files
+.vscode/*
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# =========================
+# Local accidental artifacts
+# =========================
+%SystemDrive%/
+undefined/
+dev-server.*.log
