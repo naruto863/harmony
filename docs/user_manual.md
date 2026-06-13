@@ -3,12 +3,13 @@
 ## 1. 基本信息与导读
 
 **项目名称**: Harmony Admin
-**当前版本**: 0.0.0 (开发版)
-**基于框架**: React + Vite + TypeScript + Shadcn UI + Tailwind CSS
+**当前版本**: 0.1.0
+**项目定位**: 纯前端系统管理台示例项目，不包含后端服务
+**基于框架**: React + Vite + TypeScript + shadcn/ui + Tailwind CSS
 
 ### 导读
 
-本手册旨在帮助开发者和最终用户快速了解 Harmony Admin 管理系统的功能架构、核心概念及使用方法。文档涵盖了从环境搭建到功能操作、再到部署上线的完整流程。
+本手册旨在帮助开发者和最终用户快速了解 Harmony Admin 管理台的功能架构、核心概念及使用方法。仓库默认启用本地演示 Mock，便于在没有后端服务的情况下预览主要界面；接入生产系统时需要关闭演示 Mock 并对接自己的外部 API。
 
 ---
 
@@ -16,29 +17,42 @@
 
 ### 环境准备
 
-- Node.js (推荐 v18+)
-- npm 或 yarn/pnpm
+- Node.js 22 LTS（本地至少使用 Node.js 20+）
+- npm 10+（仓库以 `package-lock.json` 和 `npm ci` 为默认工作流）
 
 ### 启动步骤
 
 1. **克隆代码库**
 
    ```bash
-   git clone https://github.com/TODO/harmony-admin.git
+   git clone https://github.com/<owner>/harmony-admin.git
    cd harmony-admin
    ```
 
 2. **安装依赖**
 
    ```bash
-   npm install
+   npm ci
    ```
 
-3. **启动开发服务器**
+3. **准备本地配置**
+
+   ```bash
+   cp .env.example .env.development
+   ```
+
+   默认配置会启用本地演示 Mock：
+
+   ```env
+   VITE_API_BASE_URL=http://localhost:9080
+   VITE_ENABLE_DEMO_MOCKS=true
+   ```
+
+4. **启动开发服务器**
    ```bash
    npm run dev
    ```
-   启动后访问终端提示的地址（通常为 `http://localhost:5173`）。
+   默认访问地址为 `http://localhost:8080`。
 
 ---
 
@@ -46,7 +60,7 @@
 
 ### 3.1 产品概览
 
-Harmony Admin 是一个现代化的多租户后台管理系统框架，旨在提供高效、美观且功能完备的企业级管理解决方案。系统集成了用户权限管理、多租户切换、数据可视化大屏及丰富 System 设置功能。
+Harmony Admin 是一个现代化的多租户后台管理台前端示例，旨在提供高效、美观且功能完备的企业级管理界面参考。系统集成了用户权限管理、多租户切换、数据可视化大屏及丰富系统设置功能。
 
 ### 3.2 核心概念
 
@@ -61,7 +75,7 @@ Harmony Admin 是一个现代化的多租户后台管理系统框架，旨在提
 
 ### 4.1 认证与安全
 
-- **注册与登录**: 支持用户自行注册及账号登录。
+- **注册与登录**: 支持本地演示账号登录，也可接入外部 API 的注册登录接口。
 - **租户选择**: 登录后支持多租户切换 (`/select-tenant`)，适应多组织架构。
 - **权限守卫**: 路由级权限控制 (`AuthGuard`)，确保未授权用户无法访问敏感页面。
 
@@ -117,7 +131,7 @@ npm run preview
 
 ### 部署
 
-将 `dist` 目录下的所有文件部署到任意静态 Web 服务器（如 Nginx, Apache, Vercel, Netlify）。
+将 `dist` 目录下的所有文件部署到任意静态 Web 服务器（如 Nginx、Apache、Vercel、Netlify）。
 
 **Nginx 配置示例**:
 

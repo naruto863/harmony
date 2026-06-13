@@ -8,11 +8,13 @@
 - `public/` 为静态资源，`docs/` 为文档；构建相关配置见 `vite.config.ts`、`tailwind.config.ts`、`tsconfig*.json`、`eslint.config.js`。
 
 ## 构建、测试与开发命令
-- `npm install` 安装依赖。
+- `npm ci` 安装依赖，仓库以 `package-lock.json` 和 npm 作为默认包管理方式。
 - `npm run dev` 启动 Vite 开发服务器。
 - `npm run build` 生产构建；`npm run build:dev` 以 development 模式构建。
 - `npm run preview` 预览构建产物。
 - `npm run lint` 运行 ESLint 规则检查。
+- `npm run typecheck` 运行 TypeScript 项目引用检查。
+- `npm run test` 运行 Vitest 测试。
 
 ## 编码风格与命名约定
 - 使用 TypeScript + React，模块别名 `@/` 指向 `src/`。
@@ -21,8 +23,9 @@
 - 以 ESLint 输出为准，提交前保证 `npm run lint` 通过。
 
 ## 测试指南
-- 当前未配置测试脚本或框架（未发现 Vitest/Jest/RTL），暂无覆盖率门槛。
-- 若新增测试，建议采用 `*.test.tsx` 或 `__tests__/` 结构，并补充 `npm run test` 脚本。
+- 当前已配置 Vitest、jsdom 和 React Testing Library，测试入口见 `vitest.config.ts` 与 `src/test/setup.ts`。
+- 新增测试优先采用 `*.test.ts` / `*.test.tsx`，与被测模块就近放置。
+- 提交前建议至少运行 `npm run lint`、`npm run typecheck`、`npm run test`、`npm run build`。
 
 ## 提交与 PR 指南
 - 提交格式：`type(scope)!: subject`，`scope` 可省略；破坏性变更用 `!` 或 `BREAKING CHANGE:`。
