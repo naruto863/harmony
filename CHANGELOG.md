@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-13
+
+### Added
+
+- 增强真实 API 接入体验：统一 401 refresh、403 权限事件、422 字段错误和 5xx TraceId 反馈。
+- 登录认证新增验证码、记住我、找回/重置密码、SSO provider 和 SSO callback 前端入口。
+- 租户设置新增租户列表、成员治理、管理员标记和成员角色调整入口。
+- 消息中心新增公告模板管理和公告阅读统计入口。
+- 导入导出新增任务列表、状态筛选、失败任务重试、运行中任务取消和错误报告下载入口。
+- 文件中心新增上传策略、鉴权下载短期 URL、鉴权预览短期 URL 和不可预览反馈。
+- `DataTable` 新增搜索无结果、接口不可用、字段错误和批量部分失败状态。
+
+### Changed
+
+- 同步 `docs/API_CONTRACT.md`、`docs/FRONTEND_API_CONTRACT.md`、`docs/DEMO_BOUNDARY.md` 和人工验收清单，明确 v0.6 external API 契约。
+- 保持 pure frontend + Demo Mock + external API contract 边界，不恢复仓库内置后端。
+
 ## [0.5.0] - 2026-06-13
 
 ### Added

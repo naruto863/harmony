@@ -842,6 +842,7 @@ export const UsersPage: React.FC = () => {
       <ExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
+        entityType="users"
         entityLabel="用户"
         totalCount={filteredUsers.length}
         selectedCount={selectedIds.length}

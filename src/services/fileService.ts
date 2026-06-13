@@ -1,5 +1,5 @@
 import { ApiResponse } from "@/types";
-import { apiClient } from "./apiClient";
+import { ApiError, apiClient } from "./apiClient";
 
 export interface FileItem {
   id: string;
@@ -24,14 +24,41 @@ export interface GetFilesParams {
   type?: string;
 }
 
+export interface UploadPolicy {
+  maxFileSize: number;
+  allowedMimeTypes: string[];
+  maxFilesPerUpload: number;
+  remainingQuota: number;
+  storageStrategy?: string;
+  note?: string;
+}
+
+export interface FileAccessUrl {
+  url: string;
+  expiresAt?: string;
+}
+
+export interface FilePreviewUrl {
+  previewable: boolean;
+  previewUrl?: string;
+  expiresAt?: string;
+  reason?: string;
+}
+
 const wrapSuccess = <T>(data: T): ApiResponse<T> => ({
   success: true,
   data,
 });
 
-const wrapError = (message: string): ApiResponse<never> => ({
+const wrapError = (message: string, error?: unknown): ApiResponse<never> => ({
   success: false,
-  error: { code: "REQUEST_FAILED", message },
+  error: {
+    code: error instanceof ApiError && error.code ? String(error.code) : "REQUEST_FAILED",
+    message,
+    status: error instanceof ApiError ? error.status : undefined,
+    traceId: error instanceof ApiError ? error.traceId : undefined,
+    fieldErrors: error instanceof ApiError ? error.fieldErrors : undefined,
+  },
 });
 
 const MAX_PAGE_SIZE = 100;
@@ -66,7 +93,40 @@ export const getFiles = async (params: GetFilesParams): Promise<ApiResponse<File
       },
     };
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : "加载文件失败");
+    return wrapError(error instanceof Error ? error.message : "加载文件失败", error);
+  }
+};
+
+export const getUploadPolicy = async (params: {
+  tenantId: string;
+  parentId?: string | null;
+}): Promise<ApiResponse<UploadPolicy>> => {
+  try {
+    const query = new URLSearchParams();
+    query.set("tenantId", params.tenantId);
+    if (params.parentId !== undefined) query.set("parentId", params.parentId ?? "");
+    const policy = await apiClient.get<UploadPolicy>(`/api/files/upload-policy?${query.toString()}`);
+    return wrapSuccess(policy);
+  } catch (error) {
+    return wrapError(error instanceof Error ? error.message : "加载上传限制失败", error);
+  }
+};
+
+export const getFileDownloadUrl = async (fileId: string): Promise<ApiResponse<FileAccessUrl>> => {
+  try {
+    const result = await apiClient.get<FileAccessUrl>(`/api/files/${fileId}/download-url`);
+    return wrapSuccess(result);
+  } catch (error) {
+    return wrapError(error instanceof Error ? error.message : "获取下载链接失败", error);
+  }
+};
+
+export const getFilePreviewUrl = async (fileId: string): Promise<ApiResponse<FilePreviewUrl>> => {
+  try {
+    const result = await apiClient.get<FilePreviewUrl>(`/api/files/${fileId}/preview-url`);
+    return wrapSuccess(result);
+  } catch (error) {
+    return wrapError(error instanceof Error ? error.message : "获取预览链接失败", error);
   }
 };
 
@@ -82,7 +142,7 @@ export const createFolder = async (data: { name: string; parentId: string | null
     });
     return wrapSuccess(response);
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : "创建文件夹失败");
+    return wrapError(error instanceof Error ? error.message : "创建文件夹失败", error);
   }
 };
 
@@ -94,7 +154,7 @@ export const uploadFile = async (data: { file: File; parentId: string | null; te
     );
     return wrapSuccess(response);
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : "上传失败");
+    return wrapError(error instanceof Error ? error.message : "上传失败", error);
   }
 };
 
@@ -111,7 +171,7 @@ export const deleteFile = async (fileId: string): Promise<ApiResponse<void>> => 
     await apiClient.delete<void>(`/api/files/${fileId}`);
     return wrapSuccess(undefined);
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : "删除失败");
+    return wrapError(error instanceof Error ? error.message : "删除失败", error);
   }
 };
 
@@ -120,7 +180,7 @@ export const batchDeleteFiles = async (fileIds: string[]): Promise<ApiResponse<v
     await Promise.all(fileIds.map((id) => apiClient.delete<void>(`/api/files/${id}`)));
     return wrapSuccess(undefined);
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : "批量删除失败");
+    return wrapError(error instanceof Error ? error.message : "批量删除失败", error);
   }
 };
 
@@ -140,7 +200,7 @@ export const getStorageStats = async (tenantId: string): Promise<ApiResponse<{ u
     const folderCount = files.filter((f) => f.isFolder).length;
     return wrapSuccess({ used, total: 10 * 1024 * 1024 * 1024, fileCount, folderCount });
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : "加载统计失败");
+    return wrapError(error instanceof Error ? error.message : "加载统计失败", error);
   }
 };
 

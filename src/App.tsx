@@ -39,6 +39,9 @@ import {
   LazySecuritySettings,
   LazySessionsSettings,
   LazyLogin,
+  LazyForgotPassword,
+  LazyResetPassword,
+  LazySsoCallback,
   LazyRegister,
   LazySelectTenant,
   LazyForbidden,
@@ -173,6 +176,9 @@ const AppRoutes = () => {
     <Routes>
       {/* 公开路由 */}
       <Route path="/login" element={<LazyLogin />} />
+      <Route path="/forgot-password" element={<LazyForgotPassword />} />
+      <Route path="/reset-password" element={<LazyResetPassword />} />
+      <Route path="/auth/sso/callback" element={<LazySsoCallback />} />
       <Route path="/register" element={<LazyRegister />} />
 
       {/* 需要认证但不需要租户的路由 */}

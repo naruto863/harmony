@@ -534,6 +534,7 @@ export const ProjectsPage: React.FC = () => {
       <ExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
+        entityType="projects"
         entityLabel="项目"
         totalCount={filteredProjects.length}
         selectedCount={0}

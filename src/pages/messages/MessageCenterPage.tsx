@@ -50,8 +50,12 @@ import {
   toggleStar,
   archiveNotification,
   deleteNotification,
+  createNoticeTemplate,
+  deleteNoticeTemplate,
   getEmailMessages,
   getUnreadEmailCount,
+  getNoticeReadStats,
+  getNoticeTemplates,
   markEmailAsRead,
   toggleEmailStar,
   moveEmailToFolder,
@@ -61,6 +65,9 @@ import {
   NotificationCategory,
   NotificationType,
   EmailMessage,
+  NoticeReadStats,
+  NoticeTemplate,
+  updateNoticeTemplate,
 } from '@/services/notificationService';
 import { cn } from '@/lib/utils';
 import { isDemoModeEnabled } from '@/lib/demoMode';
@@ -106,12 +113,20 @@ export const MessageCenterPage: React.FC = () => {
   const [notifFilter, setNotifFilter] = useState<'all' | 'unread' | 'starred' | 'archived'>('all');
   const [emailFolder, setEmailFolder] = useState<EmailMessage['folder']>('inbox');
   const [searchQuery, setSearchQuery] = useState('');
+  const [noticeTemplates, setNoticeTemplates] = useState<NoticeTemplate[]>([]);
+  const [templateName, setTemplateName] = useState('');
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [templateContent, setTemplateContent] = useState('');
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [selectedNoticeStats, setSelectedNoticeStats] = useState<NoticeReadStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // 加载数据
   const loadData = async () => {
     setLoading(true);
     try {
-      const [notifs, notifCount, emailCount, folderCounts] = await Promise.all([
+      const [notifs, notifCount, emailCount, folderCounts, templates] = await Promise.all([
         getNotifications({ 
           unreadOnly: notifFilter === 'unread',
           starred: notifFilter === 'starred' ? true : undefined,
@@ -120,6 +135,7 @@ export const MessageCenterPage: React.FC = () => {
         getUnreadCount(),
         emailDemoEnabled ? getUnreadEmailCount() : Promise.resolve(0),
         emailDemoEnabled ? getEmailFolderCounts() : Promise.resolve({ inbox: 0, sent: 0, drafts: 0, trash: 0, spam: 0 }),
+        getNoticeTemplates(),
       ]);
       
       const emailList = emailDemoEnabled ? await getEmailMessages({ folder: emailFolder }) : [];
@@ -129,6 +145,7 @@ export const MessageCenterPage: React.FC = () => {
       setUnreadNotifCount(notifCount);
       setUnreadEmailCount(emailCount);
       setEmailFolderCounts(folderCounts);
+      setNoticeTemplates(templates);
     } catch (error) {
       toast.error('加载消息失败');
     } finally {
@@ -149,9 +166,18 @@ export const MessageCenterPage: React.FC = () => {
   // 处理通知点击
   const handleNotificationClick = async (notif: Notification) => {
     setSelectedNotification(notif);
+    setSelectedNoticeStats(null);
+    setStatsLoading(true);
     if (!notif.isRead) {
       await markAsRead(notif.id);
       loadData();
+    }
+    try {
+      setSelectedNoticeStats(await getNoticeReadStats(notif.id));
+    } catch {
+      setSelectedNoticeStats(null);
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -200,6 +226,62 @@ export const MessageCenterPage: React.FC = () => {
     }
     toast.success('已删除');
     loadData();
+  };
+
+  const resetTemplateForm = () => {
+    setTemplateName('');
+    setTemplateTitle('');
+    setTemplateContent('');
+    setEditingTemplateId(null);
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim() || !templateTitle.trim()) {
+      toast.error('请输入模板名称和标题');
+      return;
+    }
+    setTemplateSaving(true);
+    try {
+      const payload = {
+        name: templateName.trim(),
+        title: templateTitle.trim(),
+        content: templateContent,
+        status: 'active' as const,
+      };
+      const saved = editingTemplateId
+        ? await updateNoticeTemplate(editingTemplateId, payload)
+        : await createNoticeTemplate(payload);
+      setNoticeTemplates((prev) => {
+        const withoutSaved = prev.filter((template) => template.id !== saved.id);
+        return [saved, ...withoutSaved];
+      });
+      resetTemplateForm();
+      toast.success(editingTemplateId ? '模板已更新' : '模板已创建');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '保存模板失败');
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
+
+  const handleEditTemplate = (template: NoticeTemplate) => {
+    setEditingTemplateId(template.id);
+    setTemplateName(template.name);
+    setTemplateTitle(template.title);
+    setTemplateContent(template.content);
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    try {
+      await deleteNoticeTemplate(templateId);
+      setNoticeTemplates((prev) => prev.filter((template) => template.id !== templateId));
+      if (editingTemplateId === templateId) {
+        resetTemplateForm();
+      }
+      toast.success('模板已删除');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '删除模板失败');
+    }
   };
 
   // 过滤消息
@@ -309,6 +391,54 @@ export const MessageCenterPage: React.FC = () => {
                     <Archive className="h-4 w-4 mr-2" />
                     已归档
                   </Button>
+                  <Separator />
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <FileText className="h-4 w-4" />
+                      公告模板
+                    </div>
+                    <Input
+                      placeholder="模板名称"
+                      value={templateName}
+                      onChange={(event) => setTemplateName(event.target.value)}
+                    />
+                    <Input
+                      placeholder="公告标题"
+                      value={templateTitle}
+                      onChange={(event) => setTemplateTitle(event.target.value)}
+                    />
+                    <textarea
+                      className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="公告内容"
+                      value={templateContent}
+                      onChange={(event) => setTemplateContent(event.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button size="sm" onClick={handleSaveTemplate} disabled={templateSaving}>
+                        {templateSaving && <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" />}
+                        {editingTemplateId ? '更新' : '新增'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={resetTemplateForm}>
+                        清空
+                      </Button>
+                    </div>
+                    <div className="space-y-1">
+                      {noticeTemplates.slice(0, 4).map((template) => (
+                        <div key={template.id} className="rounded-md border p-2 text-xs">
+                          <div className="truncate font-medium">{template.name}</div>
+                          <div className="truncate text-muted-foreground">{template.title}</div>
+                          <div className="mt-2 flex gap-1">
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => handleEditTemplate(template)}>
+                              编辑
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => handleDeleteTemplate(template.id)}>
+                              删除
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -460,6 +590,34 @@ export const MessageCenterPage: React.FC = () => {
                           </Button>
                         </div>
                       )}
+                      <div className="mt-6 rounded-lg border p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="text-sm font-medium">阅读统计</p>
+                          {statsLoading && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
+                        </div>
+                        {selectedNoticeStats ? (
+                          <div className="grid grid-cols-4 gap-3 text-center text-sm">
+                            <div>
+                              <div className="font-semibold">{selectedNoticeStats.total}</div>
+                              <div className="text-muted-foreground">总人数</div>
+                            </div>
+                            <div>
+                              <div className="font-semibold text-green-600">{selectedNoticeStats.read}</div>
+                              <div className="text-muted-foreground">已读</div>
+                            </div>
+                            <div>
+                              <div className="font-semibold text-destructive">{selectedNoticeStats.unread}</div>
+                              <div className="text-muted-foreground">未读</div>
+                            </div>
+                            <div>
+                              <div className="font-semibold">{selectedNoticeStats.readRate}%</div>
+                              <div className="text-muted-foreground">阅读率</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">暂无阅读统计或外部 API 未提供统计数据。</p>
+                        )}
+                      </div>
                     </CardContent>
                   </div>
                 ) : (

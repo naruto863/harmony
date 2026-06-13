@@ -10,11 +10,67 @@ export type LoginResponse = {
   passwordChangeRequired: boolean;
 };
 
-export const login = (email: string, password: string, tenantId?: string) => {
-  if (isDemoApiEnabled()) {
-    return demoLogin(email, password, tenantId);
+export type LoginOptions = {
+  tenantId?: string;
+  captchaId?: string;
+  captchaCode?: string;
+  rememberMe?: boolean;
+};
+
+export type CaptchaChallenge = {
+  captchaId: string;
+  imageUrl?: string;
+  imageBase64?: string;
+  expiresAt?: string;
+};
+
+export type PasswordResetConfirmRequest = {
+  token: string;
+  newPassword: string;
+};
+
+export type SsoProvider = {
+  id: string;
+  name: string;
+  type: "oauth2" | "oidc" | "saml" | string;
+  enabled: boolean;
+  iconUrl?: string;
+};
+
+export type SsoStartRequest = {
+  providerId: string;
+  redirectUri?: string;
+};
+
+export type SsoStartResponse = {
+  redirectUrl: string;
+  state: string;
+};
+
+export type SsoCallbackRequest = {
+  providerId?: string;
+  code: string;
+  state?: string;
+  redirectUri?: string;
+};
+
+const normalizeLoginOptions = (options?: string | LoginOptions): LoginOptions => {
+  if (typeof options === "string") {
+    return { tenantId: options };
   }
-  return apiClient.post<LoginResponse>("/api/auth/login", { email, password, tenantId });
+  return options ?? {};
+};
+
+export const login = (email: string, password: string, options?: string | LoginOptions) => {
+  const loginOptions = normalizeLoginOptions(options);
+  if (isDemoApiEnabled()) {
+    return demoLogin(email, password, loginOptions.tenantId);
+  }
+  return apiClient.post<LoginResponse>("/api/auth/login", {
+    email,
+    password,
+    ...loginOptions,
+  });
 };
 
 export const register = (email: string, password: string, name: string) => {
@@ -38,4 +94,46 @@ export const logout = (refreshTokenValue: string) => {
     return demoLogout();
   }
   return apiClient.post<void>("/api/auth/logout", { refreshToken: refreshTokenValue });
+};
+
+export const getCaptchaChallenge = () => {
+  if (isDemoApiEnabled()) {
+    return Promise.resolve(null);
+  }
+  return apiClient.get<CaptchaChallenge>("/api/auth/captcha");
+};
+
+export const requestPasswordReset = (email: string) => {
+  if (isDemoApiEnabled()) {
+    return Promise.resolve();
+  }
+  return apiClient.post<void>("/api/auth/password-reset/request", { email });
+};
+
+export const confirmPasswordReset = (request: PasswordResetConfirmRequest) => {
+  if (isDemoApiEnabled()) {
+    return Promise.resolve();
+  }
+  return apiClient.post<void>("/api/auth/password-reset/confirm", request);
+};
+
+export const getSsoProviders = () => {
+  if (isDemoApiEnabled()) {
+    return Promise.resolve<SsoProvider[]>([]);
+  }
+  return apiClient.get<SsoProvider[]>("/api/auth/sso/providers");
+};
+
+export const startSsoLogin = (request: SsoStartRequest) => {
+  if (isDemoApiEnabled()) {
+    return Promise.reject(new Error("SSO 登录需要外部身份源，请关闭 Demo Mock 后接入真实 API。"));
+  }
+  return apiClient.post<SsoStartResponse>("/api/auth/sso/start", request);
+};
+
+export const completeSsoLogin = (request: SsoCallbackRequest) => {
+  if (isDemoApiEnabled()) {
+    return Promise.reject(new Error("SSO 回调需要外部身份源，请关闭 Demo Mock 后接入真实 API。"));
+  }
+  return apiClient.post<LoginResponse>("/api/auth/sso/callback", request);
 };

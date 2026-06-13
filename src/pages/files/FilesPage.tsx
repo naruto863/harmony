@@ -77,9 +77,12 @@ import {
   deleteFile,
   batchDeleteFiles,
   getStorageStats,
+  getUploadPolicy,
+  getFileDownloadUrl,
   formatFileSize,
   getFileIconType,
   FileItem,
+  UploadPolicy,
 } from '@/services/fileService';
 
 export const FilesPage: React.FC = () => {
@@ -96,6 +99,8 @@ export const FilesPage: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [storageStats, setStorageStats] = useState<{ used: number; total: number; fileCount: number; folderCount: number } | null>(null);
+  const [uploadPolicy, setUploadPolicy] = useState<UploadPolicy | null>(null);
+  const [uploadPolicyError, setUploadPolicyError] = useState<string | null>(null);
   
   // 弹窗状态
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -146,6 +151,22 @@ export const FilesPage: React.FC = () => {
       setStorageStats(response.data);
     }
   }, [currentTenant]);
+
+  const loadUploadPolicy = useCallback(async () => {
+    if (!currentTenant) return;
+
+    const response = await getUploadPolicy({
+      tenantId: currentTenant.id,
+      parentId: currentFolderId,
+    });
+    if (response.success && response.data) {
+      setUploadPolicy(response.data);
+      setUploadPolicyError(null);
+    } else {
+      setUploadPolicy(null);
+      setUploadPolicyError(response.error?.message || '加载上传限制失败');
+    }
+  }, [currentFolderId, currentTenant]);
   
   useEffect(() => {
     loadFiles();
@@ -154,7 +175,8 @@ export const FilesPage: React.FC = () => {
   
   useEffect(() => {
     loadStorageStats();
-  }, [loadStorageStats]);
+    loadUploadPolicy();
+  }, [loadStorageStats, loadUploadPolicy]);
   
   // 进入文件夹
   const handleFolderClick = (folder: FileItem) => {
@@ -264,8 +286,16 @@ export const FilesPage: React.FC = () => {
   };
   
   // 下载文件
-  const handleDownload = (file: FileItem) => {
-    window.open(file.url, '_blank');
+  const handleDownload = async (file: FileItem) => {
+    const response = await getFileDownloadUrl(file.id);
+    if (response.success && response.data?.url) {
+      window.open(response.data.url, '_blank', 'noopener,noreferrer');
+    } else {
+      toast({
+        title: response.error?.status === 403 ? '无权下载文件' : response.error?.message || '获取下载链接失败',
+        variant: 'destructive',
+      });
+    }
   };
   
   // 选择处理
@@ -335,6 +365,16 @@ export const FilesPage: React.FC = () => {
                     <span>{storageStats.folderCount} 个文件夹</span>
                   </div>
                 </div>
+                {uploadPolicy?.storageStrategy && (
+                  <div className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                    存储策略：{uploadPolicy.storageStrategy}
+                  </div>
+                )}
+                {uploadPolicyError && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    {uploadPolicyError}
+                  </div>
+                )}
               </>
             )}
           </CardContent>
@@ -537,6 +577,8 @@ export const FilesPage: React.FC = () => {
         onOpenChange={setUploadOpen}
         onUpload={handleUpload}
         isUploading={isUploading}
+        uploadPolicy={uploadPolicy}
+        policyError={uploadPolicyError}
       />
       
       <CreateFolderDialog

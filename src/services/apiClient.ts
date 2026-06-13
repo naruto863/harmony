@@ -11,15 +11,24 @@ export type ApiEnvelopeResponse<T> = {
   timestamp?: string | null;
 };
 
+export type ApiFieldErrors = Record<string, string[]>;
+
 export class ApiError extends Error {
   code?: number;
   status?: number;
   traceId?: string | null;
   timestamp?: string | null;
+  fieldErrors?: ApiFieldErrors;
 
   constructor(
     message: string,
-    options: { code?: number; status?: number; traceId?: string | null; timestamp?: string | null } = {}
+    options: {
+      code?: number;
+      status?: number;
+      traceId?: string | null;
+      timestamp?: string | null;
+      fieldErrors?: ApiFieldErrors;
+    } = {}
   ) {
     super(message);
     this.name = "ApiError";
@@ -27,6 +36,7 @@ export class ApiError extends Error {
     this.status = options.status;
     this.traceId = options.traceId ?? null;
     this.timestamp = options.timestamp ?? null;
+    this.fieldErrors = options.fieldErrors;
   }
 }
 
@@ -78,6 +88,20 @@ const safeErrorMessage = (
     return traceId ? `系统异常，请稍后重试（TraceId: ${traceId}）` : "系统异常，请稍后重试";
   }
   return rawMessage;
+};
+
+const isFieldErrors = (value: unknown): value is ApiFieldErrors => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value as Record<string, unknown>).every((messages) =>
+    Array.isArray(messages) && messages.every((message) => typeof message === "string")
+  );
+};
+
+const getFieldErrors = (payload: ApiEnvelopeResponse<unknown> | null): ApiFieldErrors | undefined => {
+  const data = payload?.data;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return undefined;
+  const candidate = (data as { fieldErrors?: unknown }).fieldErrors;
+  return isFieldErrors(candidate) ? candidate : undefined;
 };
 
 let refreshPromise: Promise<boolean> | null = null;
@@ -155,6 +179,7 @@ const request = async <T>(method: string, path: string, options: RequestOptions 
     status,
     traceId,
     timestamp: payload?.timestamp ?? null,
+    fieldErrors: getFieldErrors(payload),
   });
   const isUnauthorized = status === 401 || code === 401;
   const isForbidden = status === 403 || code === 403;

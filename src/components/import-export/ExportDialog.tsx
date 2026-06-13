@@ -12,12 +12,14 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Download, FileText, AlertTriangle } from 'lucide-react';
-import { ExportFormat } from '@/services/importExportService';
+import { ExportEntityType, ExportFormat } from '@/services/importExportService';
 import { ImportExportTask } from '@/types';
+import { ImportExportTaskList } from './ImportExportTaskList';
 
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  entityType: ExportEntityType;
   entityLabel: string;
   totalCount: number;
   selectedCount: number;
@@ -28,6 +30,7 @@ interface ExportDialogProps {
 export const ExportDialog: React.FC<ExportDialogProps> = ({
   open,
   onOpenChange,
+  entityType,
   entityLabel,
   totalCount,
   selectedCount,
@@ -38,6 +41,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   const [exportSelected, setExportSelected] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [task, setTask] = useState<ImportExportTask | null>(null);
+  const [taskRefreshKey, setTaskRefreshKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const handleExport = async () => {
@@ -47,6 +51,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       const result = await onExport(format, exportSelected && selectedCount > 0);
       if (result && 'taskType' in result) {
         setTask(result);
+        setTaskRefreshKey((value) => value + 1);
       } else {
         onOpenChange(false);
       }
@@ -62,7 +67,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>导出{entityLabel}</DialogTitle>
           <DialogDescription>
@@ -124,6 +129,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               )}
             </div>
           )}
+
+          <ImportExportTaskList
+            entityType={entityType}
+            taskType="export"
+            refreshKey={taskRefreshKey}
+          />
 
           {error && (
             <Alert variant="destructive">

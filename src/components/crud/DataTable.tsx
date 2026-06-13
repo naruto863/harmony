@@ -44,6 +44,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Popover,
   PopoverContent,
@@ -65,6 +66,7 @@ import {
   X,
   Columns3,
   GripVertical,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -97,6 +99,25 @@ export interface RowAction<T> {
   show?: (row: T) => boolean;
 }
 
+export type DataTableEmptyReason = 'noData' | 'noResults' | 'noPermission' | 'apiUnavailable';
+
+export interface DataTableEmptyState {
+  reason: DataTableEmptyReason;
+  title?: string;
+  description?: string;
+}
+
+export interface DataTableErrorState {
+  message: string;
+  traceId?: string | null;
+  fieldErrors?: Record<string, string[]>;
+}
+
+export interface BatchActionResult {
+  successCount?: number;
+  failed?: { id: string; message: string }[];
+}
+
 export interface DataTableProps<T extends { id: string }> {
   data: T[];
   columns: Column<T>[];
@@ -110,10 +131,12 @@ export interface DataTableProps<T extends { id: string }> {
   batchActions?: {
     label: string;
     icon?: React.ReactNode;
-    onClick: (selectedIds: string[]) => void;
+    onClick: (selectedIds: string[]) => void | BatchActionResult | Promise<void | BatchActionResult>;
     variant?: 'default' | 'destructive';
   }[];
   emptyMessage?: string;
+  emptyState?: DataTableEmptyState;
+  errorState?: DataTableErrorState | null;
   enableColumnToggle?: boolean;
   enableColumnResize?: boolean;
   enableRowDrag?: boolean;
@@ -184,6 +207,8 @@ export function DataTable<T extends { id: string }>({
   onRowClick,
   batchActions,
   emptyMessage,
+  emptyState,
+  errorState,
   enableColumnToggle = true,
   enableColumnResize = true,
   enableRowDrag = false,
@@ -196,6 +221,8 @@ export function DataTable<T extends { id: string }>({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchFeedback, setBatchFeedback] = useState<BatchActionResult | null>(null);
+  const [batchBusyKey, setBatchBusyKey] = useState<string | null>(null);
   const [columnFilters, setColumnFilters] = useState<ColumnFilterValue>({});
   const [localData, setLocalData] = useState<T[]>(data);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
@@ -446,6 +473,45 @@ export function DataTable<T extends { id: string }>({
   const isAllSelected = paginatedData.length > 0 && 
     paginatedData.every(row => selectedIds.has(row.id));
   const isSomeSelected = paginatedData.some(row => selectedIds.has(row.id));
+  const hasQueryState = Boolean(search) || activeFiltersCount > 0;
+  const batchFailureCount = batchFeedback?.failed?.length ?? 0;
+
+  const resolveEmptyMessage = () => {
+    if (errorState?.message) return '接口暂不可用';
+    if (emptyState?.title) return emptyState.title;
+    if (emptyState?.reason === 'noPermission') return '暂无权限查看数据';
+    if (emptyState?.reason === 'apiUnavailable') return '接口暂不可用';
+    if (hasQueryState) return '未找到匹配结果';
+    return emptyMessage || t('common.noData');
+  };
+
+  const handleBatchAction = async (
+    action: NonNullable<DataTableProps<T>['batchActions']>[number],
+    index: number,
+  ) => {
+    const selected = Array.from(selectedIds);
+    const actionKey = `${action.label}-${index}`;
+    setBatchBusyKey(actionKey);
+    setBatchFeedback(null);
+    try {
+      const result = await action.onClick(selected);
+      if (result && result.failed && result.failed.length > 0) {
+        setBatchFeedback(result);
+      } else {
+        setSelectedIds(new Set());
+      }
+    } catch (error) {
+      setBatchFeedback({
+        successCount: 0,
+        failed: selected.map((id) => ({
+          id,
+          message: error instanceof Error ? error.message : '批量操作失败',
+        })),
+      });
+    } finally {
+      setBatchBusyKey(null);
+    }
+  };
 
   // 渲染排序图标
   const renderSortIcon = (key: string) => {
@@ -645,7 +711,8 @@ export function DataTable<T extends { id: string }>({
                   key={index}
                   size="sm"
                   variant={action.variant === 'destructive' ? 'destructive' : 'outline'}
-                  onClick={() => action.onClick(Array.from(selectedIds))}
+                  disabled={batchBusyKey === `${action.label}-${index}`}
+                  onClick={() => handleBatchAction(action, index)}
                 >
                   {action.icon}
                   {action.label}
@@ -655,6 +722,37 @@ export function DataTable<T extends { id: string }>({
           )}
         </div>
       </div>
+
+      {errorState && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="space-y-1">
+            <div>{errorState.message}</div>
+            {errorState.traceId && (
+              <div className="text-xs">TraceId: {errorState.traceId}</div>
+            )}
+            {errorState.fieldErrors && Object.entries(errorState.fieldErrors).map(([field, messages]) => (
+              <div key={field} className="text-xs">
+                {field}：{messages.join('、')}
+              </div>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {batchFailureCount > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="space-y-1">
+            <div>{batchFailureCount} 项操作失败</div>
+            {batchFeedback?.failed?.map((item) => (
+              <div key={item.id} className="text-xs">
+                {item.id}：{item.message}
+              </div>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* 表格 */}
       <DndContext
@@ -735,7 +833,12 @@ export function DataTable<T extends { id: string }>({
                   colSpan={visibleColumns.length + (batchActions ? 1 : 0) + (rowActions ? 1 : 0) + (enableRowDrag ? 1 : 0)} 
                   className="h-32 text-center text-muted-foreground"
                 >
-                  {emptyMessage || t('common.noData')}
+                  <div className="space-y-1">
+                    <div>{resolveEmptyMessage()}</div>
+                    {emptyState?.description && (
+                      <div className="text-xs">{emptyState.description}</div>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : enableRowDrag ? (

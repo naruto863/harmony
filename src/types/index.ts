@@ -34,6 +34,17 @@ export interface TenantMembership {
   joinedAt: string;
 }
 
+export interface TenantMember {
+  userId: string;
+  userName: string;
+  email: string;
+  status: 'active' | 'inactive' | 'pending';
+  roleId?: string;
+  roleName?: string;
+  isAdmin: boolean;
+  joinedAt: string;
+}
+
 // ==================== 权限相关类型 ====================
 export type RoleType = 'super_admin' | 'tenant_admin' | 'manager' | 'viewer' | 'custom';
 export type DataScopeType = 'ALL' | 'DEPT' | 'DEPT_AND_CHILDREN' | 'SELF' | 'CUSTOM';
@@ -174,7 +185,9 @@ export interface ServiceResult<T> {
   error?: {
     code: string;
     message: string;
+    status?: number;
     traceId?: string | null;
+    fieldErrors?: Record<string, string[]>;
   };
   meta?: {
     page: number;
@@ -295,6 +308,7 @@ export type ImportExportTaskPhase =
   | 'confirmed'
   | 'executing'
   | 'generated'
+  | 'cancelled'
   | 'failed';
 
 export interface ImportExportTaskError {

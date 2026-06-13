@@ -5,6 +5,7 @@ export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 export type NotificationCategory = 'system' | 'project' | 'user' | 'security';
 export type NotificationChannel = 'inapp' | 'email' | 'both';
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type NoticeTemplateStatus = 'active' | 'inactive';
 
 export interface Notification {
   id: string;
@@ -76,6 +77,48 @@ type NoticeDto = {
   isStarred?: boolean;
   readAt?: string | null;
 };
+
+export interface NoticeTemplate {
+  id: string;
+  name: string;
+  title: string;
+  content: string;
+  category?: NotificationCategory;
+  channel?: NotificationChannel;
+  status: NoticeTemplateStatus;
+  updatedAt: string;
+}
+
+export interface NoticeTemplatePayload {
+  name?: string;
+  title?: string;
+  content?: string;
+  category?: NotificationCategory;
+  channel?: NotificationChannel;
+  status?: NoticeTemplateStatus;
+}
+
+export interface NoticeReadStats {
+  noticeId: string;
+  total: number;
+  read: number;
+  unread: number;
+  readRate: number;
+  unreadMembers?: Array<{ userId: string; userName: string; email?: string }>;
+}
+
+let NOTICE_TEMPLATES: NoticeTemplate[] = [
+  {
+    id: 'tpl_maintenance',
+    name: '维护公告',
+    title: '系统维护通知',
+    content: '系统将在计划窗口内进行维护，请提前保存工作。',
+    category: 'system',
+    channel: 'inapp',
+    status: 'active',
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+  },
+];
 
 // Mock 邮件数据
 let EMAIL_MESSAGES: EmailMessage[] = [
@@ -284,6 +327,78 @@ export const addNotification = async (
     link: notification.link,
   });
   return mapNoticeToNotification(created);
+};
+
+export const getNoticeTemplates = async (): Promise<NoticeTemplate[]> => {
+  if (isDemoModeEnabled()) {
+    return [...NOTICE_TEMPLATES];
+  }
+  return apiClient.get<NoticeTemplate[]>('/api/notices/templates');
+};
+
+export const createNoticeTemplate = async (payload: NoticeTemplatePayload): Promise<NoticeTemplate> => {
+  if (isDemoModeEnabled()) {
+    const now = new Date().toISOString();
+    const template: NoticeTemplate = {
+      id: `tpl_${Date.now()}`,
+      name: payload.name || '未命名模板',
+      title: payload.title || '',
+      content: payload.content || '',
+      category: payload.category || 'system',
+      channel: payload.channel || 'inapp',
+      status: payload.status || 'active',
+      updatedAt: now,
+    };
+    NOTICE_TEMPLATES = [template, ...NOTICE_TEMPLATES];
+    return template;
+  }
+  return apiClient.post<NoticeTemplate>('/api/notices/templates', payload);
+};
+
+export const updateNoticeTemplate = async (
+  templateId: string,
+  payload: NoticeTemplatePayload
+): Promise<NoticeTemplate> => {
+  if (isDemoModeEnabled()) {
+    const now = new Date().toISOString();
+    const existing = NOTICE_TEMPLATES.find((template) => template.id === templateId);
+    const updated: NoticeTemplate = {
+      id: templateId,
+      name: payload.name ?? existing?.name ?? '未命名模板',
+      title: payload.title ?? existing?.title ?? '',
+      content: payload.content ?? existing?.content ?? '',
+      category: payload.category ?? existing?.category ?? 'system',
+      channel: payload.channel ?? existing?.channel ?? 'inapp',
+      status: payload.status ?? existing?.status ?? 'active',
+      updatedAt: now,
+    };
+    NOTICE_TEMPLATES = NOTICE_TEMPLATES.map((template) => template.id === templateId ? updated : template);
+    if (!existing) NOTICE_TEMPLATES = [updated, ...NOTICE_TEMPLATES];
+    return updated;
+  }
+  return apiClient.put<NoticeTemplate>(`/api/notices/templates/${templateId}`, payload);
+};
+
+export const deleteNoticeTemplate = async (templateId: string): Promise<void> => {
+  if (isDemoModeEnabled()) {
+    NOTICE_TEMPLATES = NOTICE_TEMPLATES.filter((template) => template.id !== templateId);
+    return;
+  }
+  await apiClient.delete<void>(`/api/notices/templates/${templateId}`);
+};
+
+export const getNoticeReadStats = async (noticeId: string): Promise<NoticeReadStats> => {
+  if (isDemoModeEnabled()) {
+    return {
+      noticeId,
+      total: 3,
+      read: 2,
+      unread: 1,
+      readRate: 67,
+      unreadMembers: [{ userId: 'user_viewer', userName: '观察员', email: 'viewer@example.com' }],
+    };
+  }
+  return apiClient.get<NoticeReadStats>(`/api/notices/${noticeId}/read-stats`);
 };
 
 // ==================== 邮件相关 ====================

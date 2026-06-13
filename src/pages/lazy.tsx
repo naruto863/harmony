@@ -152,6 +152,21 @@ export const LazyLogin = lazyLoad(
   <PageLoader />
 );
 
+export const LazyForgotPassword = lazyLoad(
+  () => import('@/pages/auth/ForgotPassword').then(m => ({ default: m.ForgotPassword })),
+  <PageLoader />
+);
+
+export const LazyResetPassword = lazyLoad(
+  () => import('@/pages/auth/ResetPassword').then(m => ({ default: m.ResetPassword })),
+  <PageLoader />
+);
+
+export const LazySsoCallback = lazyLoad(
+  () => import('@/pages/auth/SsoCallback').then(m => ({ default: m.SsoCallback })),
+  <PageLoader />
+);
+
 export const LazyRegister = lazyLoad(
   () => import('@/pages/auth/Register').then(m => ({ default: m.Register })),
   <PageLoader />

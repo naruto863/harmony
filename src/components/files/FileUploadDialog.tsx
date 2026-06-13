@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Upload, File, X, CheckCircle } from 'lucide-react';
-import { formatFileSize } from '@/services/fileService';
+import { formatFileSize, UploadPolicy } from '@/services/fileService';
 
 const ACCEPTED_FILE_TYPES = '.pdf,.png,.jpg,.jpeg,.gif,.txt,.csv,.doc,.docx';
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -28,6 +28,8 @@ interface FileUploadDialogProps {
   onOpenChange: (open: boolean) => void;
   onUpload: (files: File[]) => Promise<void>;
   isUploading?: boolean;
+  uploadPolicy?: UploadPolicy | null;
+  policyError?: string | null;
 }
 
 export const FileUploadDialog: React.FC<FileUploadDialogProps> = ({
@@ -35,6 +37,8 @@ export const FileUploadDialog: React.FC<FileUploadDialogProps> = ({
   onOpenChange,
   onUpload,
   isUploading,
+  uploadPolicy,
+  policyError,
 }) => {
   const [files, setFiles] = React.useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -42,14 +46,31 @@ export const FileUploadDialog: React.FC<FileUploadDialogProps> = ({
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
+
+    const maxFileSize = uploadPolicy?.maxFileSize ?? MAX_FILE_SIZE_BYTES;
+    const maxFiles = uploadPolicy?.maxFilesPerUpload ?? Number.POSITIVE_INFINITY;
+    const allowedMimeTypes = uploadPolicy?.allowedMimeTypes ?? [];
     
-    const newFiles: UploadFile[] = Array.from(selectedFiles).map(file => ({
-      id: `${file.name}_${Date.now()}`,
-      file,
-      progress: 0,
-      status: file.size > MAX_FILE_SIZE_BYTES ? 'error' : 'pending',
-      error: file.size > MAX_FILE_SIZE_BYTES ? '文件超过 10MB 限制' : undefined,
-    }));
+    const newFiles: UploadFile[] = Array.from(selectedFiles).map((file, index) => {
+      let error: string | undefined;
+      if (files.length + index >= maxFiles) {
+        error = `单次最多上传 ${maxFiles} 个文件`;
+      } else if (file.size > maxFileSize) {
+        error = `文件超过 ${formatFileSize(maxFileSize)} 限制`;
+      } else if (uploadPolicy && file.size > uploadPolicy.remainingQuota) {
+        error = '文件大小超过当前剩余配额';
+      } else if (allowedMimeTypes.length > 0 && file.type && !allowedMimeTypes.includes(file.type)) {
+        error = '文件类型不在允许范围内';
+      }
+
+      return {
+        id: `${file.name}_${Date.now()}`,
+        file,
+        progress: 0,
+        status: error ? 'error' : 'pending',
+        error,
+      };
+    });
     
     setFiles(prev => [...prev, ...newFiles]);
   };
@@ -100,6 +121,12 @@ export const FileUploadDialog: React.FC<FileUploadDialogProps> = ({
         </DialogHeader>
         
         <div className="space-y-4">
+          {policyError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {policyError}
+            </div>
+          )}
+
           {/* 拖拽区域 */}
           <div
             className={`
@@ -115,7 +142,7 @@ export const FileUploadDialog: React.FC<FileUploadDialogProps> = ({
               ref={inputRef}
               type="file"
               multiple
-              accept={ACCEPTED_FILE_TYPES}
+              accept={uploadPolicy?.allowedMimeTypes?.join(',') || ACCEPTED_FILE_TYPES}
               className="hidden"
               onChange={(e) => handleFileSelect(e.target.files)}
             />
@@ -124,8 +151,14 @@ export const FileUploadDialog: React.FC<FileUploadDialogProps> = ({
               点击或拖拽文件到此处上传
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              支持 PDF、图片、文本、CSV、Office 文档，单个文件最大 10MB
+              单个文件最大 {formatFileSize(uploadPolicy?.maxFileSize ?? MAX_FILE_SIZE_BYTES)}
+              {uploadPolicy ? `，单次最多 ${uploadPolicy.maxFilesPerUpload} 个，剩余配额 ${formatFileSize(uploadPolicy.remainingQuota)}` : ''}
             </p>
+            {uploadPolicy?.allowedMimeTypes?.length ? (
+              <p className="text-xs text-muted-foreground mt-1">
+                允许类型：{uploadPolicy.allowedMimeTypes.join('、')}
+              </p>
+            ) : null}
           </div>
           
           {/* 文件列表 */}

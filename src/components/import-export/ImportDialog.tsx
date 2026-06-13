@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, FileText, CheckCircle, XCircle, Download, AlertTriangle } from 'lucide-react';
 import { ExportEntityType, ExportFormat, ImportResult, validateImportFile, downloadTemplate } from '@/services/importExportService';
 import { ImportExportTask } from '@/types';
+import { ImportExportTaskList } from './ImportExportTaskList';
 
 interface ImportDialogProps {
   open: boolean;
@@ -39,6 +40,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [task, setTask] = useState<ImportExportTask | null>(null);
+  const [taskRefreshKey, setTaskRefreshKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const templateFormat: ExportFormat = 'csv';
@@ -110,6 +112,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
       setProgress(100);
       if ('taskType' in importResult) {
         setTask(importResult);
+        setTaskRefreshKey((value) => value + 1);
       } else {
         setResult(importResult);
       }
@@ -138,7 +141,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>导入{entityLabel}</DialogTitle>
           <DialogDescription>
@@ -304,6 +307,12 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
               )}
             </div>
           )}
+
+          <ImportExportTaskList
+            entityType={entityType}
+            taskType="import"
+            refreshKey={taskRefreshKey}
+          />
 
           {/* 错误提示 */}
           {error && (

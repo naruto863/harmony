@@ -1,6 +1,15 @@
-import { ImportExportTask, ImportExportTaskError, Project, Role, ServiceResult, User } from '@/types';
-import { demoStorageKey, requireDemoMode } from '@/lib/demoMode';
-import { apiClient } from './apiClient';
+import {
+  ImportExportTask,
+  ImportExportTaskError,
+  ImportExportTaskStatus,
+  ImportExportTaskType,
+  Project,
+  Role,
+  ServiceResult,
+  User,
+} from '@/types';
+import { demoStorageKey, isDemoModeEnabled, requireDemoMode } from '@/lib/demoMode';
+import { ApiError, apiClient } from './apiClient';
 
 // 模拟延迟
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -16,21 +25,43 @@ export interface ImportResult {
   errors: { row: number; field?: string; message: string }[];
 }
 
+export interface ImportExportTaskQuery {
+  taskType?: ImportExportTaskType;
+  entityType?: ExportEntityType;
+  status?: ImportExportTaskStatus;
+}
+
 type ImportExportTaskPayload = Omit<ImportExportTask, 'errors'> & {
   errorDetails?: string | null;
 };
 
 const IMPORT_EXPORT_TASK_API = '/api/import-export/tasks';
+const IMPORT_EXPORT_DEMO_TASK_KEY = demoStorageKey('import-export-tasks');
 
 const wrapSuccess = <T>(data: T): ServiceResult<T> => ({
   success: true,
   data,
 });
 
-const wrapError = (message: string): ServiceResult<never> => ({
+const wrapError = (message: string, error?: unknown): ServiceResult<never> => ({
   success: false,
-  error: { code: 'REQUEST_FAILED', message },
+  error: {
+    code: error instanceof ApiError && error.code ? String(error.code) : 'REQUEST_FAILED',
+    message,
+    status: error instanceof ApiError ? error.status : undefined,
+    traceId: error instanceof ApiError ? error.traceId : undefined,
+    fieldErrors: error instanceof ApiError ? error.fieldErrors : undefined,
+  },
 });
+
+const buildTaskQuery = (query: ImportExportTaskQuery = {}) => {
+  const params = new URLSearchParams();
+  if (query.taskType) params.set('taskType', query.taskType);
+  if (query.entityType) params.set('entityType', query.entityType);
+  if (query.status) params.set('status', query.status);
+  const queryString = params.toString();
+  return queryString ? `?${queryString}` : '';
+};
 
 export const parseImportExportTaskErrors = (errorDetails?: string | null): ImportExportTaskError[] => {
   if (!errorDetails) return [];
@@ -62,12 +93,114 @@ const normalizeTask = (task: ImportExportTaskPayload): ImportExportTask => ({
   errors: parseImportExportTaskErrors(task.errorDetails),
 });
 
-export const getImportExportTasks = async (): Promise<ServiceResult<ImportExportTask[]>> => {
+const createDemoTask = (taskType: ImportExportTaskType, entityType: ExportEntityType): ImportExportTask => {
+  const now = new Date().toISOString();
+  const task: ImportExportTask = {
+    id: `demo_task_${taskType}_${Date.now()}`,
+    createdBy: 'demo',
+    taskType,
+    entityType,
+    format: 'csv',
+    status: taskType === 'export' ? 'completed' : 'pending',
+    phase: taskType === 'export' ? 'generated' : 'queued',
+    sourceFileId: taskType === 'import' ? 'demo_upload' : undefined,
+    downloadUrl: taskType === 'export' ? 'data:text/csv;charset=utf-8,%EF%BB%BFid,name%0A1,demo' : undefined,
+    totalCount: taskType === 'export' ? 12 : 0,
+    successCount: taskType === 'export' ? 12 : 0,
+    failedCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const tasks = readDemoTasks();
+  writeDemoTasks([task, ...tasks]);
+  return task;
+};
+
+const getSeedDemoTasks = (): ImportExportTask[] => {
+  const now = new Date().toISOString();
+  return [
+    {
+      id: 'demo_import_failed',
+      createdBy: 'demo',
+      taskType: 'import',
+      entityType: 'users',
+      format: 'csv',
+      status: 'failed',
+      phase: 'failed',
+      totalCount: 8,
+      successCount: 6,
+      failedCount: 2,
+      errorDetails: JSON.stringify([
+        { row: 3, field: 'email', message: '邮箱已存在' },
+        { row: 7, field: 'name', message: '姓名不能为空' },
+      ]),
+      errors: [
+        { row: 3, field: 'email', message: '邮箱已存在' },
+        { row: 7, field: 'name', message: '姓名不能为空' },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'demo_export_completed',
+      createdBy: 'demo',
+      taskType: 'export',
+      entityType: 'users',
+      format: 'csv',
+      status: 'completed',
+      phase: 'generated',
+      totalCount: 12,
+      successCount: 12,
+      failedCount: 0,
+      downloadUrl: 'data:text/csv;charset=utf-8,%EF%BB%BFid,name%0A1,demo',
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+};
+
+const readDemoTasks = (): ImportExportTask[] => {
+  if (typeof localStorage === 'undefined') return getSeedDemoTasks();
+  const raw = localStorage.getItem(IMPORT_EXPORT_DEMO_TASK_KEY);
+  if (!raw) {
+    const seeded = getSeedDemoTasks();
+    writeDemoTasks(seeded);
+    return seeded;
+  }
   try {
-    const tasks = await apiClient.get<ImportExportTaskPayload[]>(IMPORT_EXPORT_TASK_API);
+    const parsed = JSON.parse(raw) as ImportExportTaskPayload[];
+    return parsed.map(normalizeTask);
+  } catch {
+    return getSeedDemoTasks();
+  }
+};
+
+const writeDemoTasks = (tasks: ImportExportTask[]) => {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(IMPORT_EXPORT_DEMO_TASK_KEY, JSON.stringify(tasks));
+};
+
+const filterTasks = (tasks: ImportExportTask[], query: ImportExportTaskQuery) => (
+  tasks.filter((task) => {
+    if (query.taskType && task.taskType !== query.taskType) return false;
+    if (query.entityType && task.entityType !== query.entityType) return false;
+    if (query.status && task.status !== query.status) return false;
+    return true;
+  })
+);
+
+export const getImportExportTasks = async (
+  query: ImportExportTaskQuery = {}
+): Promise<ServiceResult<ImportExportTask[]>> => {
+  if (isDemoModeEnabled()) {
+    return wrapSuccess(filterTasks(readDemoTasks(), query));
+  }
+
+  try {
+    const tasks = await apiClient.get<ImportExportTaskPayload[]>(`${IMPORT_EXPORT_TASK_API}${buildTaskQuery(query)}`);
     return wrapSuccess(tasks.map(normalizeTask));
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : '加载导入导出任务失败');
+    return wrapError(error instanceof Error ? error.message : '加载导入导出任务失败', error);
   }
 };
 
@@ -76,7 +209,7 @@ export const getImportExportTask = async (taskId: string): Promise<ServiceResult
     const task = await apiClient.get<ImportExportTaskPayload>(`${IMPORT_EXPORT_TASK_API}/${taskId}`);
     return wrapSuccess(normalizeTask(task));
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : '加载导入导出任务失败');
+    return wrapError(error instanceof Error ? error.message : '加载导入导出任务失败', error);
   }
 };
 
@@ -84,6 +217,10 @@ export const createExportTask = async (
   entityType: ExportEntityType,
   format: ExportFormat = 'csv'
 ): Promise<ServiceResult<ImportExportTask>> => {
+  if (isDemoModeEnabled()) {
+    return wrapSuccess(createDemoTask('export', entityType));
+  }
+
   try {
     const task = await apiClient.post<ImportExportTaskPayload>(`${IMPORT_EXPORT_TASK_API}/export`, {
       entityType,
@@ -91,7 +228,7 @@ export const createExportTask = async (
     });
     return wrapSuccess(normalizeTask(task));
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : '创建导出任务失败');
+    return wrapError(error instanceof Error ? error.message : '创建导出任务失败', error);
   }
 };
 
@@ -99,6 +236,10 @@ export const createImportTask = async (
   entityType: ExportEntityType,
   fileId: string
 ): Promise<ServiceResult<ImportExportTask>> => {
+  if (isDemoModeEnabled()) {
+    return wrapSuccess(createDemoTask('import', entityType));
+  }
+
   try {
     const task = await apiClient.post<ImportExportTaskPayload>(`${IMPORT_EXPORT_TASK_API}/import`, {
       entityType,
@@ -106,7 +247,7 @@ export const createImportTask = async (
     });
     return wrapSuccess(normalizeTask(task));
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : '创建导入任务失败');
+    return wrapError(error instanceof Error ? error.message : '创建导入任务失败', error);
   }
 };
 
@@ -115,6 +256,10 @@ export const createImportTaskFromFile = async (
   file: File,
   tenantId: string
 ): Promise<ServiceResult<ImportExportTask>> => {
+  if (isDemoModeEnabled()) {
+    return wrapSuccess(createDemoTask('import', entityType));
+  }
+
   try {
     const query = new URLSearchParams();
     if (tenantId) query.set('tenantId', tenantId);
@@ -124,7 +269,72 @@ export const createImportTaskFromFile = async (
     );
     return createImportTask(entityType, uploaded.id);
   } catch (error) {
-    return wrapError(error instanceof Error ? error.message : '上传并创建导入任务失败');
+    return wrapError(error instanceof Error ? error.message : '上传并创建导入任务失败', error);
+  }
+};
+
+export const retryImportExportTask = async (taskId: string): Promise<ServiceResult<ImportExportTask>> => {
+  if (isDemoModeEnabled()) {
+    const tasks = readDemoTasks();
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return wrapError('任务不存在');
+    const updated: ImportExportTask = {
+      ...task,
+      status: 'pending',
+      phase: 'queued',
+      updatedAt: new Date().toISOString(),
+    };
+    writeDemoTasks(tasks.map((item) => item.id === taskId ? updated : item));
+    return wrapSuccess(updated);
+  }
+
+  try {
+    const task = await apiClient.post<ImportExportTaskPayload>(`${IMPORT_EXPORT_TASK_API}/${taskId}/retry`);
+    return wrapSuccess(normalizeTask(task));
+  } catch (error) {
+    return wrapError(error instanceof Error ? error.message : '重试导入导出任务失败', error);
+  }
+};
+
+export const cancelImportExportTask = async (taskId: string): Promise<ServiceResult<ImportExportTask>> => {
+  if (isDemoModeEnabled()) {
+    const tasks = readDemoTasks();
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return wrapError('任务不存在');
+    const updated: ImportExportTask = {
+      ...task,
+      status: 'cancelled',
+      phase: 'cancelled',
+      updatedAt: new Date().toISOString(),
+    };
+    writeDemoTasks(tasks.map((item) => item.id === taskId ? updated : item));
+    return wrapSuccess(updated);
+  }
+
+  try {
+    const task = await apiClient.post<ImportExportTaskPayload>(`${IMPORT_EXPORT_TASK_API}/${taskId}/cancel`);
+    return wrapSuccess(normalizeTask(task));
+  } catch (error) {
+    return wrapError(error instanceof Error ? error.message : '取消导入导出任务失败', error);
+  }
+};
+
+export const downloadImportExportErrorReport = async (taskId: string): Promise<ServiceResult<string>> => {
+  if (isDemoModeEnabled()) {
+    const tasks = readDemoTasks();
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return wrapError('任务不存在');
+    const rows = ['row,field,message', ...(task.errors ?? []).map((error) => (
+      `${error.row ?? ''},${error.field ?? ''},${error.message}`
+    ))];
+    return wrapSuccess(`data:text/csv;charset=utf-8,%EF%BB%BF${encodeURIComponent(rows.join('\n'))}`);
+  }
+
+  try {
+    const report = await apiClient.get<{ downloadUrl: string }>(`${IMPORT_EXPORT_TASK_API}/${taskId}/error-report`);
+    return wrapSuccess(report.downloadUrl);
+  } catch (error) {
+    return wrapError(error instanceof Error ? error.message : '下载错误报告失败', error);
   }
 };
 

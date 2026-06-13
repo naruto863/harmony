@@ -23,3 +23,14 @@
 - 菜单权限：确认岗位和用户组菜单分别使用 `positions.read`、`user-groups.read`；按钮权限使用对应 create/update/delete 权限码。
 - 真实 API 模式：确认 `VITE_ENABLE_DEMO_MOCKS=false` 后，岗位、用户组、组织树和用户列表请求指向 `VITE_API_BASE_URL` 配置的外部 API。
 - 文档口径：确认对外文档仍描述为纯前端项目，未把 Demo Mock 写成生产服务端实现。
+
+## v0.6 待人工验收
+
+- 真实 API 错误：关闭 Demo Mock 后，分别模拟缺接口、401、403、422 和 5xx，确认页面提示清晰，5xx 可看到或记录 `traceId`。
+- 登录认证：确认 `/api/auth/captcha` 可控制验证码展示；找回密码、重置密码、SSO provider 和 SSO callback 能处理成功、失败、缺少 code/state 和外部 API 错误。
+- 租户治理：进入 `/settings/tenant`，确认租户列表、成员列表、管理员标记、角色调整和成员移除请求均指向 `/api/tenants` 与 `/api/tenants/{tenantId}/members` 系列接口。
+- 公告通知：进入消息中心，确认公告模板可创建、编辑、删除；公告详情可展示 `/api/notices/{noticeId}/read-stats` 返回的已读、未读和阅读率。
+- 导入导出：创建导入或导出任务后，确认任务列表可筛选和刷新；失败任务可调用 `/api/import-export/tasks/{taskId}/error-report`，失败任务可重试，排队或运行中任务可取消。
+- 文件中心：确认上传弹窗展示 `/api/files/upload-policy` 返回的大小、类型、数量、配额和存储策略；下载通过 `/api/files/{fileId}/download-url`，预览通过 `/api/files/{fileId}/preview-url`。
+- CRUD 状态：确认 `DataTable` 在加载、无数据、搜索无结果、无权限、接口不可用、字段错误、批量部分失败和列配置变化时表现符合产品预期。
+- Demo 边界：确认 Demo Mock 只作为预览路径，没有把 SSO、邮件短信、对象存储、导入导出 Worker 或服务端权限写成仓库内置能力。

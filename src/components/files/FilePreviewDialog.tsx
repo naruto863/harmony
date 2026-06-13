@@ -7,10 +7,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { FileItem, formatFileSize, getFileIconType } from '@/services/fileService';
+import {
+  FileItem,
+  FilePreviewUrl,
+  formatFileSize,
+  getFileDownloadUrl,
+  getFileIconType,
+  getFilePreviewUrl,
+} from '@/services/fileService';
 import { 
+  AlertTriangle,
   Download, 
   ExternalLink,
   Folder,
@@ -52,15 +61,45 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
   onOpenChange,
   file,
 }) => {
+  const [preview, setPreview] = React.useState<FilePreviewUrl | null>(null);
+  const [loadingPreview, setLoadingPreview] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open || !file || file.isFolder) return;
+
+    setLoadingPreview(true);
+    setPreview(null);
+    setError(null);
+    getFilePreviewUrl(file.id)
+      .then((response) => {
+        if (response.success && response.data) {
+          setPreview(response.data);
+        } else {
+          setError(response.error?.message || '获取预览链接失败');
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : '获取预览链接失败');
+      })
+      .finally(() => setLoadingPreview(false));
+  }, [file, open]);
+
   if (!file) return null;
 
   const iconType = getFileIconType(file);
   const isImage = file.type.startsWith('image/');
   const isPdf = file.type.includes('pdf');
+  const previewUrl = preview?.previewUrl;
 
-  const handleDownload = () => {
-    // 实际项目中应该触发下载
-    window.open(file.url, '_blank');
+  const handleDownload = async () => {
+    setError(null);
+    const response = await getFileDownloadUrl(file.id);
+    if (response.success && response.data?.url) {
+      window.open(response.data.url, '_blank', 'noopener,noreferrer');
+    } else {
+      setError(response.error?.message || '获取下载链接失败');
+    }
   };
 
   return (
@@ -74,29 +113,51 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
         </DialogHeader>
         
         <div className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {loadingPreview && (
+            <div className="rounded-lg border bg-muted/50 p-8 text-center text-sm text-muted-foreground">
+              正在获取预览链接...
+            </div>
+          )}
+
           {/* 预览区域 */}
-          {isImage && (
+          {!loadingPreview && preview && !preview.previewable && (
+            <div className="rounded-lg border bg-muted/50 p-8 flex flex-col items-center justify-center min-h-[200px]">
+              <FileIcon type={iconType} className="h-16 w-16 mb-4" />
+              <p className="text-sm text-muted-foreground">
+                {preview.reason || '此文件暂不支持在线预览'}
+              </p>
+            </div>
+          )}
+
+          {!loadingPreview && isImage && preview?.previewable && previewUrl && (
             <div className="rounded-lg border bg-muted/50 p-4 flex items-center justify-center min-h-[300px]">
               <img 
-                src={file.url} 
+                src={previewUrl} 
                 alt={file.name}
                 className="max-w-full max-h-[400px] object-contain rounded"
               />
             </div>
           )}
           
-          {isPdf && (
+          {!loadingPreview && isPdf && preview?.previewable && previewUrl && (
             <div className="rounded-lg border bg-muted/50 p-4 flex flex-col items-center justify-center min-h-[300px]">
               <FileIcon type="pdf" className="h-16 w-16 mb-4" />
               <p className="text-sm text-muted-foreground mb-4">PDF 文件预览</p>
-              <Button variant="outline" onClick={() => window.open(file.url, '_blank')}>
+              <Button variant="outline" onClick={() => window.open(previewUrl, '_blank', 'noopener,noreferrer')}>
                 <ExternalLink className="mr-2 h-4 w-4" />
                 在新标签页打开
               </Button>
             </div>
           )}
           
-          {!isImage && !isPdf && !file.isFolder && (
+          {!loadingPreview && !preview && !isImage && !isPdf && !file.isFolder && (
             <div className="rounded-lg border bg-muted/50 p-8 flex flex-col items-center justify-center min-h-[200px]">
               <FileIcon type={iconType} className="h-16 w-16 mb-4" />
               <p className="text-sm text-muted-foreground">
