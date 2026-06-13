@@ -8,5 +8,5 @@
 - [ ] `VITE_ENABLE_DEMO_MOCKS=false` 时不会继续使用演示登录数据。
 - [ ] Docker Compose 只构建前端服务，不再依赖后端或数据库目录。
 - [ ] README、CONTRIBUTING、SECURITY、PR 模板和 Release 流程不再要求 Maven、JDK、MySQL 或后端服务。
-- [ ] 发布前确认 `LICENSE` 版权主体。
+- [ ] `LICENSE` 已使用 Apache License 2.0。
 - [ ] 发布前扫描仓库未暴露真实密钥、真实账号、Cookie、Token 或内部 URL。

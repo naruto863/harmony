@@ -2,7 +2,7 @@
 
 Harmony Admin 是一个纯前端系统管理台示例项目，基于 React、TypeScript、Vite、Tailwind CSS 和 shadcn/ui 构建。仓库不包含后端服务，默认提供本地演示数据，方便直接预览权限、租户、菜单、审计日志等后台管理界面。
 
-> 注意：本仓库仍包含演示账号和 TODO 项。生产使用前请关闭演示 Mock、接入自己的 API、确认 License 版权主体，并完成安全审查。
+> 注意：本仓库包含本地演示账号。生产使用前请关闭演示 Mock、接入自己的 API，并完成安全审查。
 
 ## 功能概览
 
@@ -155,4 +155,4 @@ npm run build
 
 ## License
 
-Apache License 2.0。版权主体仍为 TODO，公开发布前请确认并替换。
+Apache License 2.0。详情见 [LICENSE](LICENSE)。

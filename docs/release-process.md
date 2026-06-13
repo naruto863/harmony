@@ -37,7 +37,6 @@
 ## Known Issues
 
 - 仓库不包含后端实现，需要使用方接入自己的 API。
-- LICENSE 版权主体仍需在正式公开前确认。
 ```
 
 ## 发布前 Checklist
@@ -46,7 +45,7 @@
 - [ ] 已扫描真实密钥、真实账号、Cookie、Token、内部 URL。
 - [ ] README 中的启动步骤可执行。
 - [ ] `CHANGELOG.md` 已更新。
-- [ ] `LICENSE` 版权主体已确认，或保留明确 TODO。
+- [ ] `LICENSE` 已使用 Apache License 2.0。
 - [ ] `npm run lint` 通过。
 - [ ] `npm run typecheck` 通过。
 - [ ] `npm run test` 通过。
