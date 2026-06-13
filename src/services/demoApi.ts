@@ -1,12 +1,31 @@
 import { isDemoModeEnabled } from "@/lib/demoMode";
-import { MENU_ITEMS, PERMISSION_GROUPS, PERMISSIONS, ROLES, TENANTS, USERS, USER_PASSWORDS, USER_TENANT_ROLES } from "@/data/mock-data";
+import {
+  DEPT_TREE,
+  MENU_ITEMS,
+  PERMISSION_GROUPS,
+  PERMISSIONS,
+  POSITIONS,
+  ROLES,
+  TENANTS,
+  USERS,
+  USER_GROUP_MEMBERS,
+  USER_GROUPS,
+  USER_PASSWORDS,
+  USER_TENANT_ROLES,
+  type DemoPosition,
+  type DemoUserGroup,
+} from "@/data/mock-data";
 import type { LoginResponse } from "./authService";
 import type { SwitchTenantResponse, TenantDto } from "./tenantService";
-import type { MenuItem, Permission, PermissionGroup, Role, User } from "@/types";
+import type { DeptNode, MenuItem, Permission, PermissionGroup, Position, Role, User, UserGroup } from "@/types";
 
 const DEMO_USER_ID_KEY = "ha_demo:auth_user_id";
 const DEMO_TENANT_ID_KEY = "ha_demo:tenant_id";
 const TENANT_KEY = "admin_studio_tenant";
+const DEMO_DEPTS_KEY = "ha_demo:depts";
+const DEMO_POSITIONS_KEY = "ha_demo:positions";
+const DEMO_USER_GROUPS_KEY = "ha_demo:user_groups";
+const DEMO_USER_GROUP_MEMBERS_KEY = "ha_demo:user_group_members";
 
 const getStorage = (): Storage | null => {
   try {
@@ -14,6 +33,31 @@ const getStorage = (): Storage | null => {
   } catch {
     return null;
   }
+};
+
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const readDemoJson = <T>(key: string, fallback: T): T => {
+  const storage = getStorage();
+  if (!storage) return clone(fallback);
+  const stored = storage.getItem(key);
+  if (!stored) {
+    const seeded = clone(fallback);
+    storage.setItem(key, JSON.stringify(seeded));
+    return seeded;
+  }
+  try {
+    return JSON.parse(stored) as T;
+  } catch {
+    const seeded = clone(fallback);
+    storage.setItem(key, JSON.stringify(seeded));
+    return seeded;
+  }
+};
+
+const writeDemoJson = <T>(key: string, value: T): void => {
+  const storage = getStorage();
+  storage?.setItem(key, JSON.stringify(value));
 };
 
 const buildDemoTokens = (userId: string, tenantId?: string) => {
@@ -91,6 +135,36 @@ const getRoleForUser = (userId: string, tenantId: string): Role | null => {
   const relation = USER_TENANT_ROLES.find((item) => item.userId === userId && item.tenantId === tenantId);
   if (!relation) return null;
   return ROLES.find((role) => role.id === relation.roleId) ?? null;
+};
+
+const flattenDepts = (items: DeptNode[]): DeptNode[] =>
+  items.flatMap((item) => [item, ...(item.children ? flattenDepts(item.children) : [])]);
+
+const getDeptName = (deptId?: string | null): string | null => {
+  if (!deptId) return null;
+  return flattenDepts(readDemoJson(DEMO_DEPTS_KEY, DEPT_TREE)).find((dept) => dept.id === deptId)?.name ?? null;
+};
+
+const readPositions = (): DemoPosition[] => readDemoJson(DEMO_POSITIONS_KEY, POSITIONS);
+
+const writePositions = (positions: DemoPosition[]): void => writeDemoJson(DEMO_POSITIONS_KEY, positions);
+
+const readUserGroups = (): DemoUserGroup[] => readDemoJson(DEMO_USER_GROUPS_KEY, USER_GROUPS);
+
+const writeUserGroups = (groups: DemoUserGroup[]): void => writeDemoJson(DEMO_USER_GROUPS_KEY, groups);
+
+const readUserGroupMembers = (): Record<string, string[]> =>
+  readDemoJson(DEMO_USER_GROUP_MEMBERS_KEY, USER_GROUP_MEMBERS);
+
+const writeUserGroupMembers = (members: Record<string, string[]>): void =>
+  writeDemoJson(DEMO_USER_GROUP_MEMBERS_KEY, members);
+
+const withMemberCount = (group: DemoUserGroup, members = readUserGroupMembers()): UserGroup => {
+  const { tenantId: _tenantId, ...publicGroup } = group;
+  return {
+    ...publicGroup,
+    memberCount: members[group.id]?.length ?? 0,
+  };
 };
 
 export const isDemoApiEnabled = (): boolean => isDemoModeEnabled();
@@ -171,3 +245,182 @@ export const demoGetAllPermissions = async (): Promise<Permission[]> => PERMISSI
 export const demoGetPermissionGroups = async (): Promise<PermissionGroup[]> => PERMISSION_GROUPS;
 
 export const demoGetMenuTree = async (): Promise<MenuItem[]> => MENU_ITEMS;
+
+export const demoGetDeptTree = async (): Promise<DeptNode[]> => readDemoJson(DEMO_DEPTS_KEY, DEPT_TREE);
+
+export const demoGetUsers = async (params: {
+  tenantId: string;
+  search?: string;
+  status?: string;
+  roleId?: string;
+}): Promise<Array<User & { roleId?: string; roleName?: string; joinedAt?: string; deptId?: string; deptName?: string }>> => {
+  const relations = USER_TENANT_ROLES.filter((relation) => relation.tenantId === params.tenantId);
+  const users = relations.flatMap((relation) => {
+    const user = USERS.find((item) => item.id === relation.userId);
+    if (!user) return [];
+    const role = ROLES.find((item) => item.id === relation.roleId);
+    return [{
+      ...user,
+      roleId: relation.roleId,
+      roleName: role?.name,
+      joinedAt: relation.joinedAt,
+    }];
+  });
+
+  return users.filter((user) => {
+    const matchesSearch = !params.search || [user.name, user.email, user.phone]
+      .filter(Boolean)
+      .some((value) => value!.toLowerCase().includes(params.search!.toLowerCase()));
+    const matchesStatus = !params.status || user.status === params.status;
+    const matchesRole = !params.roleId || user.roleId === params.roleId;
+    return matchesSearch && matchesStatus && matchesRole;
+  });
+};
+
+export const demoGetPositions = async (tenantId?: string): Promise<Position[]> => {
+  return readPositions()
+    .filter((position) => !tenantId || position.tenantId === tenantId)
+    .map(({ tenantId: _tenantId, ...position }) => position);
+};
+
+export const demoCreatePosition = async (data: {
+  name: string;
+  code: string;
+  deptId?: string | null;
+  description?: string;
+  sortOrder?: number;
+  status?: string;
+  tenantId?: string;
+}): Promise<Position> => {
+  const positions = readPositions();
+  const newPosition: DemoPosition = {
+    id: `position_${Date.now()}`,
+    tenantId: data.tenantId ?? getStoredTenantId() ?? "tenant_demo",
+    name: data.name,
+    code: data.code,
+    deptId: data.deptId ?? null,
+    deptName: getDeptName(data.deptId),
+    description: data.description,
+    sortOrder: data.sortOrder ?? positions.length * 10,
+    status: data.status ?? "active",
+  };
+  writePositions([...positions, newPosition]);
+  const { tenantId: _tenantId, ...position } = newPosition;
+  return position;
+};
+
+export const demoUpdatePosition = async (
+  positionId: string,
+  data: {
+    name?: string;
+    code?: string;
+    deptId?: string | null;
+    description?: string;
+    sortOrder?: number;
+    status?: string;
+  }
+): Promise<Position> => {
+  const positions = readPositions();
+  const index = positions.findIndex((position) => position.id === positionId);
+  if (index === -1) {
+    throw new Error("演示岗位不存在");
+  }
+  const nextPosition: DemoPosition = {
+    ...positions[index],
+    ...data,
+    deptId: data.deptId === undefined ? positions[index].deptId : data.deptId,
+    deptName: data.deptId === undefined ? positions[index].deptName : getDeptName(data.deptId),
+  };
+  const nextPositions = [...positions];
+  nextPositions[index] = nextPosition;
+  writePositions(nextPositions);
+  const { tenantId: _tenantId, ...position } = nextPosition;
+  return position;
+};
+
+export const demoDeletePosition = async (positionId: string): Promise<void> => {
+  const positions = readPositions();
+  const nextPositions = positions.filter((position) => position.id !== positionId);
+  if (nextPositions.length === positions.length) {
+    throw new Error("演示岗位不存在");
+  }
+  writePositions(nextPositions);
+};
+
+export const demoGetUserGroups = async (tenantId?: string): Promise<UserGroup[]> => {
+  const members = readUserGroupMembers();
+  return readUserGroups()
+    .filter((group) => !tenantId || group.tenantId === tenantId)
+    .map((group) => withMemberCount(group, members));
+};
+
+export const demoCreateUserGroup = async (data: {
+  name: string;
+  code: string;
+  description?: string;
+  status?: string;
+  tenantId?: string;
+}): Promise<UserGroup> => {
+  const groups = readUserGroups();
+  const newGroup: DemoUserGroup = {
+    id: `group_${Date.now()}`,
+    tenantId: data.tenantId ?? getStoredTenantId() ?? "tenant_demo",
+    name: data.name,
+    code: data.code,
+    description: data.description,
+    status: data.status ?? "active",
+    memberCount: 0,
+  };
+  writeUserGroups([...groups, newGroup]);
+  const members = readUserGroupMembers();
+  writeUserGroupMembers({ ...members, [newGroup.id]: [] });
+  return withMemberCount(newGroup, members);
+};
+
+export const demoUpdateUserGroup = async (
+  groupId: string,
+  data: { name?: string; code?: string; description?: string; status?: string }
+): Promise<UserGroup> => {
+  const groups = readUserGroups();
+  const index = groups.findIndex((group) => group.id === groupId);
+  if (index === -1) {
+    throw new Error("演示用户组不存在");
+  }
+  const nextGroup: DemoUserGroup = {
+    ...groups[index],
+    ...data,
+  };
+  const nextGroups = [...groups];
+  nextGroups[index] = nextGroup;
+  writeUserGroups(nextGroups);
+  return withMemberCount(nextGroup);
+};
+
+export const demoDeleteUserGroup = async (groupId: string): Promise<void> => {
+  const groups = readUserGroups();
+  const nextGroups = groups.filter((group) => group.id !== groupId);
+  if (nextGroups.length === groups.length) {
+    throw new Error("演示用户组不存在");
+  }
+  writeUserGroups(nextGroups);
+  const members = readUserGroupMembers();
+  const { [groupId]: _removed, ...nextMembers } = members;
+  writeUserGroupMembers(nextMembers);
+};
+
+export const demoGetUserGroupMembers = async (groupId: string): Promise<string[]> => {
+  return readUserGroupMembers()[groupId] ?? [];
+};
+
+export const demoUpdateUserGroupMembers = async (groupId: string, userIds: string[]): Promise<void> => {
+  const groupExists = readUserGroups().some((group) => group.id === groupId);
+  if (!groupExists) {
+    throw new Error("演示用户组不存在");
+  }
+  const allowedUserIds = new Set(USERS.map((user) => user.id));
+  const nextUserIds = userIds.filter((userId, index) => allowedUserIds.has(userId) && userIds.indexOf(userId) === index);
+  writeUserGroupMembers({
+    ...readUserGroupMembers(),
+    [groupId]: nextUserIds,
+  });
+};

@@ -1,5 +1,6 @@
 import { ApiResponse, User } from "@/types";
 import { apiClient } from "./apiClient";
+import { demoGetUsers, isDemoApiEnabled } from "./demoApi";
 
 export interface UserWithRole extends User {
   roleId?: string;
@@ -35,6 +36,23 @@ const resolvePageSize = (pageSize: number | undefined, fallback: number) => {
 };
 
 export const getUsers = async (params: GetUsersParams): Promise<ApiResponse<UserWithRole[]>> => {
+  if (isDemoApiEnabled()) {
+    const page = Math.max(params.page ?? 1, 1);
+    const pageSize = resolvePageSize(params.pageSize, 10);
+    const users = await demoGetUsers(params);
+    const start = (page - 1) * pageSize;
+    const list = users.slice(start, start + pageSize);
+    return {
+      success: true,
+      data: list,
+      meta: {
+        page,
+        pageSize,
+        total: users.length,
+        totalPages: Math.max(Math.ceil(users.length / pageSize), 1),
+      },
+    };
+  }
   try {
     const query = new URLSearchParams();
     query.set("tenantId", params.tenantId);

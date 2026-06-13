@@ -1,5 +1,6 @@
 import { ApiResponse, DeptNode } from "@/types";
 import { apiClient } from "./apiClient";
+import { demoGetDeptTree, isDemoApiEnabled } from "./demoApi";
 
 const wrapSuccess = <T>(data: T): ApiResponse<T> => ({
   success: true,
@@ -12,6 +13,9 @@ const wrapError = (message: string): ApiResponse<never> => ({
 });
 
 export const getDeptTree = async (): Promise<ApiResponse<DeptNode[]>> => {
+  if (isDemoApiEnabled()) {
+    return wrapSuccess(await demoGetDeptTree());
+  }
   try {
     const data = await apiClient.get<DeptNode[]>("/api/depts/tree");
     return wrapSuccess(data);

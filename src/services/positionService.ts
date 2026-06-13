@@ -1,5 +1,12 @@
 import { ApiResponse, Position } from "@/types";
 import { apiClient } from "./apiClient";
+import {
+  demoCreatePosition,
+  demoDeletePosition,
+  demoGetPositions,
+  demoUpdatePosition,
+  isDemoApiEnabled,
+} from "./demoApi";
 
 const wrapSuccess = <T>(data: T): ApiResponse<T> => ({
   success: true,
@@ -12,6 +19,9 @@ const wrapError = (message: string): ApiResponse<never> => ({
 });
 
 export const getPositions = async (tenantId?: string): Promise<ApiResponse<Position[]>> => {
+  if (isDemoApiEnabled()) {
+    return wrapSuccess(await demoGetPositions(tenantId));
+  }
   try {
     const query = tenantId ? `?tenantId=${tenantId}` : "";
     const data = await apiClient.get<Position[]>(`/api/positions${query}`);
@@ -32,6 +42,13 @@ export interface CreatePositionData {
 }
 
 export const createPosition = async (data: CreatePositionData): Promise<ApiResponse<Position>> => {
+  if (isDemoApiEnabled()) {
+    try {
+      return wrapSuccess(await demoCreatePosition(data));
+    } catch (error) {
+      return wrapError(error instanceof Error ? error.message : "创建岗位失败");
+    }
+  }
   try {
     const query = data.tenantId ? `?tenantId=${data.tenantId}` : "";
     const response = await apiClient.post<Position>(`/api/positions${query}`, {
@@ -61,6 +78,13 @@ export const updatePosition = async (
   positionId: string,
   data: UpdatePositionData
 ): Promise<ApiResponse<Position>> => {
+  if (isDemoApiEnabled()) {
+    try {
+      return wrapSuccess(await demoUpdatePosition(positionId, data));
+    } catch (error) {
+      return wrapError(error instanceof Error ? error.message : "更新岗位失败");
+    }
+  }
   try {
     const response = await apiClient.put<Position>(`/api/positions/${positionId}`, {
       name: data.name,
@@ -77,6 +101,14 @@ export const updatePosition = async (
 };
 
 export const deletePosition = async (positionId: string): Promise<ApiResponse<void>> => {
+  if (isDemoApiEnabled()) {
+    try {
+      await demoDeletePosition(positionId);
+      return wrapSuccess(undefined);
+    } catch (error) {
+      return wrapError(error instanceof Error ? error.message : "删除岗位失败");
+    }
+  }
   try {
     await apiClient.delete<void>(`/api/positions/${positionId}`);
     return wrapSuccess(undefined);

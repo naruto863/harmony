@@ -23,6 +23,15 @@
 - `403`：普通业务接口触发权限刷新事件；权限和菜单刷新接口自身不会再次触发，避免循环。
 - `5xx`：前端展示通用系统错误，不展示服务端异常细节；如响应提供 `traceId`，错误对象会保留并可用于排查。
 
+## v0.5 服务层边界
+
+- `positionService`：Demo 模式使用本地岗位数据；真实 API 模式调用 `/api/positions`。
+- `userGroupService`：Demo 模式使用本地用户组和成员数据；真实 API 模式调用 `/api/user-groups`。
+- `deptService`：Demo 模式提供只读组织树用于岗位所属部门选择；真实 API 模式调用 `/api/depts/tree`。
+- `userService`：Demo 模式返回当前租户演示用户，支撑用户组成员弹窗；真实 API 模式调用 `/api/users`。
+
+角色数据范围由前端提交 `dataScopeType` 和 `dataScopeDeptIds`，其中 `DataScopeType` 为 `ALL | DEPT | DEPT_AND_CHILDREN | SELF | CUSTOM`。真实数据过滤和越权兜底必须由外部 API 执行。
+
 ## Token 存储策略
 
 当前前端示例短期保留 `localStorage`，但所有 token 读写必须集中在 `src/services/tokenStorage.ts`，页面组件不得直接读取 token。

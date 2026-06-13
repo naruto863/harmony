@@ -1,4 +1,16 @@
-import { User, Tenant, Role, Permission, Project, AuditLog, MenuItem, PermissionGroup } from '@/types';
+import {
+  User,
+  Tenant,
+  Role,
+  Permission,
+  Project,
+  AuditLog,
+  MenuItem,
+  PermissionGroup,
+  DeptNode,
+  Position,
+  UserGroup,
+} from '@/types';
 
 // ==================== 权限定义 ====================
 export const PERMISSIONS: Permission[] = [
@@ -7,6 +19,16 @@ export const PERMISSIONS: Permission[] = [
   { id: 'users.read', resource: 'users', action: 'read', description: '查看用户' },
   { id: 'users.update', resource: 'users', action: 'update', description: '编辑用户' },
   { id: 'users.delete', resource: 'users', action: 'delete', description: '删除用户' },
+  // 岗位管理
+  { id: 'positions.create', resource: 'positions', action: 'create', description: '创建岗位' },
+  { id: 'positions.read', resource: 'positions', action: 'read', description: '查看岗位' },
+  { id: 'positions.update', resource: 'positions', action: 'update', description: '编辑岗位' },
+  { id: 'positions.delete', resource: 'positions', action: 'delete', description: '删除岗位' },
+  // 用户组管理
+  { id: 'user-groups.create', resource: 'user-groups', action: 'create', description: '创建用户组' },
+  { id: 'user-groups.read', resource: 'user-groups', action: 'read', description: '查看用户组' },
+  { id: 'user-groups.update', resource: 'user-groups', action: 'update', description: '编辑用户组' },
+  { id: 'user-groups.delete', resource: 'user-groups', action: 'delete', description: '删除用户组' },
   // 角色管理
   { id: 'roles.create', resource: 'roles', action: 'create', description: '创建角色' },
   { id: 'roles.read', resource: 'roles', action: 'read', description: '查看角色' },
@@ -36,6 +58,16 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     resource: 'users',
     label: '用户管理',
     permissions: PERMISSIONS.filter(p => p.resource === 'users'),
+  },
+  {
+    resource: 'positions',
+    label: '岗位管理',
+    permissions: PERMISSIONS.filter(p => p.resource === 'positions'),
+  },
+  {
+    resource: 'user-groups',
+    label: '用户组管理',
+    permissions: PERMISSIONS.filter(p => p.resource === 'user-groups'),
   },
   {
     resource: 'roles',
@@ -96,7 +128,19 @@ export const ROLES: Role[] = [
     name: '经理',
     type: 'manager',
     description: '管理项目和文件',
-    permissions: ['projects.create', 'projects.read', 'projects.update', 'projects.delete', 'files.create', 'files.read', 'files.delete', 'users.read', 'settings.read'],
+    permissions: [
+      'projects.create',
+      'projects.read',
+      'projects.update',
+      'projects.delete',
+      'files.create',
+      'files.read',
+      'files.delete',
+      'users.read',
+      'positions.read',
+      'user-groups.read',
+      'settings.read',
+    ],
     isSystem: true,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
@@ -106,7 +150,7 @@ export const ROLES: Role[] = [
     name: '查看者',
     type: 'viewer',
     description: '只读权限',
-    permissions: ['projects.read', 'files.read', 'users.read', 'settings.read'],
+    permissions: ['projects.read', 'files.read', 'users.read', 'positions.read', 'user-groups.read', 'settings.read'],
     isSystem: true,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
@@ -307,6 +351,106 @@ export const AUDIT_LOGS: AuditLog[] = [
   },
 ];
 
+// ==================== v0.5 系统管理演示数据 ====================
+export const DEPT_TREE: DeptNode[] = [
+  {
+    id: 'dept_root',
+    name: 'Demo 公司',
+    parentId: null,
+    sortOrder: 0,
+    status: 'active',
+    children: [
+      {
+        id: 'dept_product',
+        name: '产品部',
+        parentId: 'dept_root',
+        sortOrder: 10,
+        status: 'active',
+      },
+      {
+        id: 'dept_operations',
+        name: '运营部',
+        parentId: 'dept_root',
+        sortOrder: 20,
+        status: 'active',
+      },
+      {
+        id: 'dept_finance',
+        name: '财务部',
+        parentId: 'dept_root',
+        sortOrder: 30,
+        status: 'active',
+      },
+    ],
+  },
+];
+
+export type DemoPosition = Position & { tenantId: string };
+
+export const POSITIONS: DemoPosition[] = [
+  {
+    id: 'position_ceo',
+    tenantId: 'tenant_demo',
+    name: '总经理',
+    code: 'CEO',
+    deptId: 'dept_root',
+    deptName: 'Demo 公司',
+    description: '负责 Demo 公司整体经营管理',
+    sortOrder: 0,
+    status: 'active',
+  },
+  {
+    id: 'position_pm',
+    tenantId: 'tenant_demo',
+    name: '产品经理',
+    code: 'PM',
+    deptId: 'dept_product',
+    deptName: '产品部',
+    description: '负责产品规划和需求协同',
+    sortOrder: 10,
+    status: 'active',
+  },
+  {
+    id: 'position_ops',
+    tenantId: 'tenant_demo',
+    name: '运营专员',
+    code: 'OPS',
+    deptId: 'dept_operations',
+    deptName: '运营部',
+    description: '负责客户运营和日常协作',
+    sortOrder: 20,
+    status: 'active',
+  },
+];
+
+export type DemoUserGroup = UserGroup & { tenantId: string };
+
+export const USER_GROUPS: DemoUserGroup[] = [
+  {
+    id: 'group_ops',
+    tenantId: 'tenant_demo',
+    name: '运营小组',
+    code: 'OPS',
+    description: '负责日常运营协作',
+    status: 'active',
+    memberCount: 2,
+  },
+  {
+    id: 'group_product',
+    tenantId: 'tenant_demo',
+    name: '产品小组',
+    code: 'PRODUCT',
+    description: '负责产品规划和需求评审',
+    status: 'active',
+    memberCount: 2,
+  },
+];
+
+export const USER_GROUP_MEMBERS: Record<string, string[]> = {
+  group_ops: ['user_admin', 'user_manager'],
+  group_product: ['user_admin', 'user_viewer'],
+};
+
 // ==================== 菜单配置 ====================
 export const MENU_ITEMS: MenuItem[] = [
   {
@@ -363,6 +507,20 @@ export const MENU_ITEMS: MenuItem[] = [
     icon: 'Network',
     path: '/depts',
     permission: 'settings.update',
+  },
+  {
+    id: 'positions',
+    label: '岗位管理',
+    icon: 'Briefcase',
+    path: '/positions',
+    permission: 'positions.read',
+  },
+  {
+    id: 'user-groups',
+    label: '用户组管理',
+    icon: 'UsersRound',
+    path: '/user-groups',
+    permission: 'user-groups.read',
   },
   {
     id: 'data-screen',
