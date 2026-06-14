@@ -1,6 +1,6 @@
 # 人工验收清单
 
-更新时间：2026-06-13
+更新时间：2026-06-14
 
 ## 待人工确认
 
@@ -11,6 +11,15 @@
 - 线上环境配置：生产 API 地址、CORS、CSP、缓存策略和静态资源托管方式。
 - 产品歧义项：状态流转、删除限制、审计字段含义、异常提示文案。
 - 依赖环境：npm registry/代理是否允许执行 `npm ci` 和 `npm audit`。
+
+## v1.0 待人工验收
+
+- 干净 clone：在新目录执行 `npm ci` 后可完成本地安装。
+- 自动验证：人工复核 `npm run lint`、`npm run typecheck`、`npm run test`、`npm run build`、`npm run security:audit` 在目标环境中的结果。
+- 演示账号：确认 `admin@example.com`、`manager@example.com`、`viewer@example.com` 登录、租户选择、Dashboard、菜单和权限展示符合预期。
+- Demo 边界：确认默认 `.env.example` 可进入 Demo Mock，且 `VITE_ENABLE_DEMO_MOCKS=false` 时不继续使用演示登录数据。
+- Frontend-only 边界：确认 Docker Compose、README、CONTRIBUTING、SECURITY、PR 模板和 Release 流程均不要求仓库内置后端、数据库或 Java/Maven 环境。
+- 安全扫描：发布前人工复核仓库未暴露真实密钥、真实账号、Cookie、Token、内部 URL 或私有基础设施信息。
 
 ## v0.5 现有闭环验收
 

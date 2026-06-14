@@ -4,6 +4,26 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-14
+
+### Added
+
+- 补齐默认启用页面的 v1.0 external API contract，覆盖用户、角色、菜单、字典、参数、组织、审计日志、登录日志、文件、消息、租户设置和会话接口。
+- 增强 Demo Mock 一致性，明确 `admin@example.com`、`manager@example.com`、`viewer@example.com` 的角色、权限差异和本地存储边界。
+- 增加基础设施测试：token 存储、认证、租户、权限、菜单上下文和权限守卫。
+- 增加角色表单、登录/租户选择页、用户/角色/文件/消息页面 smoke 测试。
+
+### Changed
+
+- 将公开文档、发布流程、安全策略和用户手册统一到 v1.0.0 发布口径。
+- 明确前端权限只做展示级控制，真实授权、租户隔离和数据范围过滤由外部 API 兜底。
+- 更新测试策略和测试报告，保持 frontend-only + npm 验证命令口径。
+
+### Security
+
+- 保留 Apache License 2.0，当前版权主体为 `Copyright 2026 naruto863`。
+- 发布前验证要求包含 `npm run security:audit`。
+
 ## [0.6.0] - 2026-06-13
 
 ### Added

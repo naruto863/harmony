@@ -62,6 +62,8 @@ src/modules/<module>/
 - 菜单可见性依赖 `<module>.read`。
 - 按钮可见性依赖 create/update/delete/export 等细粒度权限。
 - 本地演示模式下，菜单和权限来自 `src/data/mock-data.ts`。
+- 前端权限只做展示级控制；真实授权、租户隔离和数据范围过滤必须由外部 API 执行。
+- 如模块需要数据范围配置，优先复用角色表单中的 `dataScopeType` 与 `dataScopeDeptIds` 语义，不在业务页面内自定义另一套授权模型。
 
 字典接入：
 

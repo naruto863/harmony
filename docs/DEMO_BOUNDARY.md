@@ -16,15 +16,17 @@ VITE_ENABLE_DEMO_MOCKS=false
 
 ## 演示账号
 
-```text
-admin@example.com / local-demo-admin
-manager@example.com / local-demo-manager
-viewer@example.com / local-demo-viewer
-```
+| 账号 | 密码 | 默认租户角色 | 权限差异 |
+| --- | --- | --- | --- |
+| `admin@example.com` | `local-demo-admin` | Demo 公司租户管理员 | 可预览用户、角色、菜单、配置、租户设置等管理入口 |
+| `manager@example.com` | `local-demo-manager` | Demo 公司经理 | 可预览项目、文件、用户/岗位/用户组只读入口，不具备角色和租户管理权限 |
+| `viewer@example.com` | `local-demo-viewer` | Demo 公司查看者 | 只读预览，创建、更新、删除类按钮应被前端隐藏 |
+
+演示账号只用于本地预览权限差异。真实授权、租户隔离、数据范围过滤和越权拒绝必须由外部 API 执行。
 
 ## 存储命名空间
 
-演示 LocalStorage 统一使用 `ha_demo:` 前缀。核心 token 仍只允许通过 `src/services/tokenStorage.ts` 读写。
+Demo-only 可变数据优先使用 `ha_demo:` 前缀，例如 `ha_demo:auth_user_id`、`ha_demo:tenant_id`、`ha_demo:positions`、`ha_demo:user_groups`。当前租户会兼容写入历史键 `admin_studio_tenant`，用于既有上下文读取；核心 token 使用 `src/services/tokenStorage.ts` 集中读写，不由页面组件直接操作。
 
 ## 默认从真实 API 模式菜单隐藏的演示路由
 

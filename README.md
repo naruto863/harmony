@@ -78,11 +78,13 @@ npm run dev
 
 默认访问地址为 `http://localhost:8080`。演示账号：
 
-```text
-admin@example.com / local-demo-admin
-manager@example.com / local-demo-manager
-viewer@example.com / local-demo-viewer
-```
+| 账号 | 密码 | 默认角色 | 预览重点 |
+| --- | --- | --- | --- |
+| `admin@example.com` | `local-demo-admin` | 租户管理员 | 用户、角色、菜单、配置、租户设置等管理入口 |
+| `manager@example.com` | `local-demo-manager` | 经理 | 项目、文件、用户/岗位/用户组只读等协作入口 |
+| `viewer@example.com` | `local-demo-viewer` | 查看者 | 只读菜单和低权限按钮隐藏效果 |
+
+这些账号只属于 Demo Mock，本地预览权限由 `src/data/mock-data.ts` 提供。关闭 `VITE_ENABLE_DEMO_MOCKS` 后，登录、租户、菜单和权限均依赖接入方提供的外部 API。
 
 ## 接入真实 API
 
@@ -143,11 +145,12 @@ npm run lint
 npm run typecheck
 npm run test
 npm run build
+npm run security:audit
 ```
 
 ## 发布
 
-首次开源版本建议为 `v0.1.0`。发布流程见 [docs/release-process.md](docs/release-process.md)。
+v1.0 发布版本建议为 `v1.0.0`。发布流程见 [docs/release-process.md](docs/release-process.md)。
 
 ## 安全
 

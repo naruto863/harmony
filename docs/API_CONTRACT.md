@@ -25,6 +25,195 @@ Harmony Admin 当前是纯前端仓库，不提供服务端实现。本文件描
 
 推荐外部 API 接受并透传 `X-Trace-Id` 请求头；未传入时由 API 服务生成。响应头或响应体中包含同一个 `traceId`，前端可在错误提示、反馈和错误上报中保留该值。
 
+## v1.0 默认启用页面接口
+
+v1.0 默认启用页面的接口契约以当前 `src/services/*` 调用为准。仓库只提供前端服务层、页面状态和 Demo Mock，不提供这些接口的服务端实现。
+
+分页接口建议在 envelope 的 `data` 中返回：
+
+```json
+{
+  "list": [],
+  "total": 0,
+  "page": 1,
+  "size": 20
+}
+```
+
+前端会把 `size` 归一为页面状态里的 `pageSize`。列表接口建议支持 `page` 从 1 开始，`size` 上限由外部 API 控制；当前前端服务层会把常见列表请求限制在 1 到 100 之间。
+
+默认错误处理规则：
+
+- `401`：需要兼容 `POST /api/auth/refresh` 的刷新凭证流程；刷新失败后前端清理 token 并触发登出。
+- `403`：表示外部 API 已拒绝越权访问；前端只做展示级菜单和按钮控制，不能替代真实授权。
+- `422`：字段错误放入 `data.fieldErrors`，结构为 `{ "field": ["message"] }`。
+- `500-599`：前端展示通用错误信息；如响应体或 `X-Trace-Id` 响应头包含 `traceId`，前端会保留用于排障。
+
+### 用户管理
+
+权限码建议：
+
+- `users.read`
+- `users.create`
+- `users.update`
+- `users.delete`
+
+接口：
+
+- `GET /api/users?tenantId={tenantId}&page={page}&size={size}&search={search}&status={status}&roleId={roleId}`：返回用户分页，`data` 使用 `list/total/page/size`。
+- `POST /api/users?tenantId={tenantId}`：创建或邀请用户，请求体字段为 `email`、`name`、`phone`、`roleId`、`deptId`；响应可返回 `{ user, temporaryPassword, passwordChangeRequired }`。
+- `POST /api/users/{userId}/password-reset?tenantId={tenantId}`：重置用户密码，响应结构同创建用户。
+- `PUT /api/users/{userId}?tenantId={tenantId}`：更新用户资料、状态、角色或部门。
+- `PATCH /api/users/{userId}/status`：更新用户状态，请求体为 `{ "status": "active|inactive|pending" }`。
+- `DELETE /api/users/{userId}?tenantId={tenantId}`：从当前租户移除用户。
+- `PUT /api/users/me`：更新当前用户资料，当前前端提交 `name`、`phone`、`avatar`。
+- `POST /api/users/me/password`：更新当前用户密码，当前前端提交 `currentPassword`、`newPassword`。
+
+外部 API 必须校验 `tenantId`、成员关系、角色分配权限和跨租户访问；前端传入的 `tenantId` 不能作为安全边界。
+
+### 角色、权限与数据范围
+
+权限码建议：
+
+- `roles.read`
+- `roles.create`
+- `roles.update`
+- `roles.delete`
+- `tenant.manage`：用于租户设置和成员治理。
+
+接口：
+
+- `GET /api/roles?tenantId={tenantId}&search={search}`：返回角色列表。
+- `GET /api/roles/mine`：返回当前用户在当前租户下的角色，可返回 `null`。
+- `POST /api/roles?tenantId={tenantId}`：创建角色，请求体字段为 `name`、`code`、`description`、`permissionIds`、`dataScopeType`、`dataScopeDeptIds`。
+- `PUT /api/roles/{roleId}`：更新角色，请求体字段为 `name`、`description`、`permissionIds`、`dataScopeType`、`dataScopeDeptIds`。
+- `DELETE /api/roles/{roleId}`：删除角色。
+- `GET /api/permissions`：返回权限码列表。
+- `GET /api/permissions/groups`：返回权限分组，前端角色表单会用于权限矩阵展示。
+
+`dataScopeType` 可选值为 `ALL`、`DEPT`、`DEPT_AND_CHILDREN`、`SELF`、`CUSTOM`；`CUSTOM` 需要配合 `dataScopeDeptIds`。真实数据过滤、越权拒绝和跨租户隔离必须由外部 API 执行。
+
+### 菜单管理
+
+接口：
+
+- `GET /api/menus/tree?tenantId={tenantId}`：返回当前租户可访问菜单树。前端期望菜单项至少包含 `id`、`label`、`icon`，可选 `path`、`permission`、`children`、`parentId`、`type`、`sortOrder`、`visible`。
+- `POST /api/menus`：创建菜单，请求体字段为 `name`、`path`、`parentId`、`icon`、`type`、`sortOrder`、`visible`、`permissionCode`。
+- `PUT /api/menus/{menuId}`：更新菜单，请求体字段同创建菜单。
+- `DELETE /api/menus/{menuId}`：删除菜单。
+
+菜单路由只会渲染前端 `ROUTE_COMPONENTS` 中存在的页面；外部 API 返回未知路由时，前端不会自动生成新页面。
+
+### 字典管理
+
+接口：
+
+- `GET /api/dicts/groups?includeItems={true|false}`：返回字典分组，`includeItems=true` 时可内联 `items`。
+- `POST /api/dicts/groups`：创建字典分组，请求体字段为 `groupKey`、`groupName`、`status`。
+- `PUT /api/dicts/groups/{groupId}`：更新字典分组，请求体字段为 `groupName`、`status`。
+- `DELETE /api/dicts/groups/{groupId}`：删除字典分组。
+- `GET /api/dicts/items?groupKey={groupKey}&groupId={groupId}`：返回字典项。
+- `POST /api/dicts/items`：创建字典项，请求体字段为 `groupId`、`itemKey`、`itemValue`、`status`、`sortOrder`。
+- `PUT /api/dicts/items/{itemId}`：更新字典项，请求体字段为 `itemKey`、`itemValue`、`status`、`sortOrder`。
+- `DELETE /api/dicts/items/{itemId}`：删除字典项。
+
+### 参数配置
+
+权限码建议：
+
+- `settings.read`
+- `settings.update`
+
+接口：
+
+- `GET /api/configs?env={env}`：返回参数配置列表。
+- `POST /api/configs`：创建参数，请求体字段为 `configKey`、`configValue`、`env`、`type`、`status`、`sensitive`、`validationRule`。
+- `PUT /api/configs/{configId}`：更新参数，请求体字段为 `configValue`、`env`、`type`、`status`、`sensitive`、`validationRule`。
+- `DELETE /api/configs/{configId}`：删除参数。
+
+外部 API 不应把生产密钥、token 或真实敏感配置写入 Demo 数据；`sensitive=true` 的值应在服务端和前端展示层同时谨慎处理。
+
+### 组织管理
+
+接口：
+
+- `GET /api/depts/tree`：返回组织树，节点字段为 `id`、`name`、`parentId`、`sortOrder`、`status`、`children`。
+- `POST /api/depts`：创建组织，请求体字段为 `name`、`parentId`、`sortOrder`、`status`。
+- `PUT /api/depts/{deptId}`：更新组织，请求体字段同创建组织。
+- `DELETE /api/depts/{deptId}`：删除组织。
+
+组织树会被岗位、用户、角色数据范围等页面复用；真实数据范围过滤仍由外部 API 兜底。
+
+### 审计日志与登录日志
+
+权限码建议：
+
+- `audit.read`
+
+接口：
+
+- `GET /api/audit-logs?tenantId={tenantId}&page={page}&size={size}&search={search}&action={action}&resource={resource}&userId={userId}&startDate={startDate}&endDate={endDate}`：返回审计日志分页，`data` 使用 `list/total/page/size`。
+- `GET /api/login-logs?page={page}&size={size}&status={status}&userId={userId}&tenantId={tenantId}`：返回登录日志分页，`data` 使用 `list/total/page/size`。
+
+`AuditLog` 建议包含 `id`、`userId`、`userName`、`tenantId`、`action`、`resource`、`resourceId`、`result`、`failureReason`、`traceId`、`durationMs`、`details`、`ipAddress`、`userAgent`、`createdAt`。当前前端审计导出是基于已查询数据生成 CSV，不要求额外的服务端导出接口。
+
+### 文件中心
+
+权限码建议：
+
+- `files.read`
+- `files.create`
+- `files.delete`
+
+接口：
+
+- `GET /api/files?tenantId={tenantId}&parentId={parentId}&page={page}&size={size}&search={search}&type={type}`：返回文件分页，`data` 使用 `list/total/page/size`。
+- `GET /api/files/upload-policy?tenantId={tenantId}&parentId={parentId}`：返回上传大小、类型、数量、剩余配额和存储策略说明。
+- `POST /api/files/upload?tenantId={tenantId}&parentId={parentId}`：上传文件，返回文件记录。
+- `POST /api/files/folders?tenantId={tenantId}`：创建文件夹，请求体字段为 `name`、`parentId`。
+- `GET /api/files/{fileId}/download-url`：返回鉴权后的短期下载 URL。
+- `GET /api/files/{fileId}/preview-url`：返回鉴权后的短期预览 URL，或返回不可预览原因。
+- `DELETE /api/files/{fileId}`：删除文件或文件夹。
+
+对象存储签名、病毒扫描、内容审核、配额计算和真实存储适配均由外部 API 完成，前端不得依赖文件记录中的裸 URL 作为生产下载入口。当前前端尚未实现文件重命名、移动和按 ID 查询的真实 API 调用。
+
+### 消息中心
+
+接口：
+
+- `GET /api/notices`：返回通知列表。
+- `POST /api/notices`：创建站内通知，请求体字段为 `title`、`content`、`category`、`type`、`channel`、`priority`、`link`。
+- `POST /api/notices/{noticeId}/read`：标记通知已读。
+- `POST /api/notices/{noticeId}/star`：切换星标状态。
+- `POST /api/notices/{noticeId}/archive`：归档通知。
+- `DELETE /api/notices/{noticeId}`：删除当前用户视角下的通知。
+- `GET /api/notices/templates`：返回公告模板列表。
+- `POST /api/notices/templates`：创建公告模板。
+- `PUT /api/notices/templates/{templateId}`：更新公告模板。
+- `DELETE /api/notices/templates/{templateId}`：删除公告模板。
+- `GET /api/notices/{noticeId}/read-stats`：返回公告已读、未读、阅读率和未读成员摘要。
+
+邮件、短信、站外推送和消息队列不属于本仓库实现；当前邮件页面相关数据是前端本地演示。
+
+### 租户设置与会话
+
+接口：
+
+- `GET /api/tenants/mine`：返回当前用户可切换的租户列表。
+- `POST /api/tenants/switch`：切换租户，请求体为 `{ "tenantId": "tenant_1" }`，响应返回新的 access token、refresh token 和租户信息。
+- `GET /api/tenants`：返回当前用户可管理或可访问的租户列表。
+- `PUT /api/tenants/{tenantId}`：更新租户资料，当前前端提交 `name`。
+- `DELETE /api/tenants/{tenantId}`：删除租户。
+- `GET /api/tenants/{tenantId}/members`：返回租户成员、角色和管理员标记。
+- `POST /api/tenants/{tenantId}/members`：新增或邀请成员，请求体字段为 `email`、`userId`、`roleId`、`isAdmin`。
+- `PUT /api/tenants/{tenantId}/members/{userId}`：调整成员角色、状态或管理员标记。
+- `DELETE /api/tenants/{tenantId}/members/{userId}`：移除成员。
+- `GET /api/sessions?userId={userId}`：返回当前用户会话列表，前端会从 `userAgent` 解析设备、浏览器和系统。
+- `DELETE /api/sessions/{sessionId}`：终止指定会话。
+- `DELETE /api/sessions/others`：终止其他会话，响应可返回终止数量。
+
+外部 API 必须执行真实租户隔离、成员授权、会话吊销和安全审计；前端只负责展示和提交。
+
 ## v0.6 真实 API 接入强化接口
 
 v0.6 继续保持 frontend-only + external API 边界：仓库只提供前端调用、状态展示和 Demo Mock，不提供身份源、对象存储、邮件短信、异步 Worker 或服务端实现。
@@ -205,18 +394,21 @@ v0.6 继续保持 frontend-only + external API 边界：仓库只提供前端调
 
 ## 权限码
 
-v0.5 新增或明确以下权限码：
+v1.0 当前 Demo 数据、菜单和服务层使用以下权限码。新增业务模块应继续优先采用 `<resource>.<action>` 形式。
 
-- `positions.create`
-- `positions.read`
-- `positions.update`
-- `positions.delete`
-- `user-groups.create`
-- `user-groups.read`
-- `user-groups.update`
-- `user-groups.delete`
+| 资源 | 权限码 | 当前用途 |
+| --- | --- | --- |
+| 用户 | `users.create`、`users.read`、`users.update`、`users.delete` | 用户管理菜单、按钮和用户服务 |
+| 角色 | `roles.create`、`roles.read`、`roles.update`、`roles.delete` | 角色权限菜单、角色表单和权限矩阵 |
+| 项目 | `projects.create`、`projects.read`、`projects.update`、`projects.delete` | Demo 项目管理入口和示例数据 |
+| 文件 | `files.create`、`files.read`、`files.delete` | 文件中心上传、查看、删除入口 |
+| 审计 | `audit.read` | 审计日志和登录日志查看入口 |
+| 设置 | `settings.read`、`settings.update` | 系统配置、参数、菜单、字典、组织和功能开关等管理入口 |
+| 租户 | `tenant.manage` | 租户设置和成员治理入口 |
+| 岗位 | `positions.create`、`positions.read`、`positions.update`、`positions.delete` | 岗位管理入口和按钮 |
+| 用户组 | `user-groups.create`、`user-groups.read`、`user-groups.update`、`user-groups.delete` | 用户组管理入口和按钮 |
 
-按钮和菜单可见性由前端使用这些权限码做展示级控制；外部 API 必须在接口层做真实授权。
+按钮和菜单可见性由前端使用这些权限码做展示级控制；外部 API 必须在接口层做真实授权、租户隔离、数据范围过滤和越权拒绝。前端角色表单提交的 `dataScopeType` 与 `dataScopeDeptIds` 只表示配置意图，不表示前端已经完成真实数据授权。
 
 ## OpenAPI
 

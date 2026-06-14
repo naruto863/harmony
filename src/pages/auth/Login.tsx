@@ -179,6 +179,7 @@ export const Login: React.FC = () => {
               <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
                 <p className="font-medium mb-1">演示账号：</p>
                 <p>管理员：admin@example.com / local-demo-admin</p>
+                <p>经理：manager@example.com / local-demo-manager</p>
                 <p>查看者：viewer@example.com / local-demo-viewer</p>
               </div>
             )}

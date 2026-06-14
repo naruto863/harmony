@@ -48,6 +48,53 @@
 - 危险批量操作仍应在业务页面使用 `ConfirmDialog` 做二次确认。
 - 批量服务可返回 `{ successCount, failed }`；`failed` 项会在 `DataTable` 中展示部分失败原因，不能把部分失败吞成全量成功。
 
+## v1.0 默认启用页面服务层入口
+
+默认启用页面必须通过 `src/services/*` 访问外部 API。页面层只消费服务层返回的业务数据、`ApiResponse<T>` 或 `ServiceResult<T>`，不得直接读取 `ApiEnvelopeResponse<T>`。
+
+### 分页与错误对象
+
+当前列表服务统一把外部 API 的分页字段转换为页面状态：
+
+- 外部 API：`data.list`、`data.total`、`data.page`、`data.size`
+- 前端服务层：`data`、`meta.total`、`meta.page`、`meta.pageSize`、`meta.totalPages`
+
+服务层错误对象应保留：
+
+- `message`：用户可读错误信息。
+- `status`：HTTP 状态码。
+- `traceId`：外部 API 响应体或响应头中的 TraceId。
+- `fieldErrors`：`422` 字段错误，供表单和 CRUD 组件展示。
+
+### 默认页面服务映射
+
+| 页面/能力 | 服务层 | 外部 API 路径 | 前端权限/边界 |
+| --- | --- | --- | --- |
+| 用户管理 | `userService` | `GET/POST /api/users`、`PUT/DELETE /api/users/{userId}`、`PATCH /api/users/{userId}/status`、`POST /api/users/{userId}/password-reset` | `users.*` 只控制前端展示，租户隔离和角色授权由外部 API 执行 |
+| 角色权限 | `roleService` | `/api/roles`、`/api/roles/mine`、`/api/permissions`、`/api/permissions/groups` | `roles.*`、`dataScopeType`、`dataScopeDeptIds` 由前端提交，真实数据过滤由外部 API 兜底 |
+| 菜单管理 | `menuService` | `/api/menus/tree`、`/api/menus`、`/api/menus/{menuId}` | 菜单树驱动动态路由，只渲染前端已声明的路由组件 |
+| 字典管理 | `dictService` | `/api/dicts/groups`、`/api/dicts/items` | 字典状态、排序和只读约束由外部 API 校验 |
+| 参数配置 | `configService` | `/api/configs`、`/api/configs/{configId}` | `settings.update` 控制前端入口，敏感值不能写入 Demo 数据 |
+| 组织管理 | `deptService` | `/api/depts/tree`、`/api/depts`、`/api/depts/{deptId}` | 组织树供用户、岗位和角色数据范围选择复用 |
+| 岗位管理 | `positionService` | `/api/positions`、`/api/positions/{positionId}` | v0.5 已补 Demo 与契约，继续使用 `positions.*` |
+| 用户组管理 | `userGroupService` | `/api/user-groups`、`/api/user-groups/{groupId}`、`/api/user-groups/{groupId}/members` | v0.5 已补 Demo 与契约，继续使用 `user-groups.*` |
+| 审计日志 | `auditLogService` | `/api/audit-logs` | 使用 `list/total/page/size` 分页；前端导出基于已查询数据生成 CSV |
+| 登录日志 | `loginLogService` | `/api/login-logs` | 复用 `audit.read` 展示入口，真实日志访问控制由外部 API 执行 |
+| 文件中心 | `fileService` | `/api/files`、`/api/files/upload-policy`、`/api/files/upload`、`/api/files/folders`、`/api/files/{fileId}/download-url`、`/api/files/{fileId}/preview-url`、`DELETE /api/files/{fileId}` | 不依赖裸 URL；上传限制、鉴权下载和预览由外部 API 提供 |
+| 消息中心 | `notificationService` | `/api/notices`、`/api/notices/{noticeId}/read`、`/api/notices/{noticeId}/star`、`/api/notices/{noticeId}/archive`、`/api/notices/templates`、`/api/notices/{noticeId}/read-stats` | 邮件、短信、站外推送和消息队列不属于仓库实现 |
+| 租户设置 | `tenantService`、`settingsService` | `/api/tenants/mine`、`/api/tenants/switch`、`/api/tenants`、`/api/tenants/{tenantId}`、`/api/tenants/{tenantId}/members` | `tenant.manage` 只控制前端入口，真实隔离和成员授权由外部 API 执行 |
+| 个人资料与密码 | `settingsService` | `/api/users/me`、`/api/users/me/password`、`/api/files/upload` | avatar 上传复用文件上传入口 |
+| 会话管理 | `security/sessionService` | `/api/sessions`、`/api/sessions/{sessionId}`、`/api/sessions/others` | 会话吊销需要外部 API 真实失效 refresh token 或服务端会话 |
+
+当前 `settingsService` 的通知偏好和功能开关、`securityService` 的 IP 白名单、登录锁定、异常检测等能力仍以本地存储或前端演示为主；关闭 Demo Mock 后，除非接入方自行提供相应 API，否则不应被描述成生产安全能力。
+
+### 权限与数据范围边界
+
+- `PermissionGuard`、`usePermission`、菜单权限和按钮权限只做前端展示级控制，用于减少无权限入口的误触。
+- 外部 API 必须执行真实授权、租户隔离、数据范围过滤和越权拒绝；不能因为前端隐藏按钮就放松接口校验。
+- 角色表单提交的 `dataScopeType` 与 `dataScopeDeptIds` 只表达配置意图。`CUSTOM` 数据范围会提交部门 ID，其他范围由外部 API 结合当前用户、角色、组织关系解释。
+- Demo Mock 中的角色数据范围只用于本地预览，不代表生产数据过滤已经在前端完成。
+
 ## v0.6 服务层入口
 
 认证相关入口集中在 `authService`：

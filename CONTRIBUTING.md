@@ -9,7 +9,7 @@
 - `feature/<topic>`：新功能分支。
 - `fix/<topic>`：缺陷修复分支。
 - `docs/<topic>`：文档更新分支。
-- `release/<version>`：发布准备分支，例如 `release/v0.1.0`。
+- `release/<version>`：发布准备分支，例如 `release/v1.0.0`。
 
 ## 版本号规范
 
@@ -19,16 +19,16 @@
 - `MINOR`：向后兼容的新能力。
 - `PATCH`：向后兼容的问题修复。
 
-首次开源版本建议为 `0.1.0`，版本号以 `package.json` 为准。
+v1.0 发布版本建议为 `1.0.0`，版本号以 `package.json` 为准。
 
 ## Tag 规范
 
-- 使用 `vX.Y.Z` 格式，例如 `v0.1.0`。
+- 使用 `vX.Y.Z` 格式，例如 `v1.0.0`。
 - 使用 annotated tag：
 
 ```bash
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
 ```
 
 ## GitHub Release 规范
@@ -107,6 +107,7 @@ npm run lint
 npm run typecheck
 npm run test
 npm run build
+npm run security:audit
 ```
 
 ## Issue 规范

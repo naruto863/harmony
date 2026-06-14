@@ -5,58 +5,61 @@
 ## 版本策略
 
 - 使用语义化版本号：`MAJOR.MINOR.PATCH`。
-- Tag 使用 `vX.Y.Z`，例如 `v0.1.0`。
+- Tag 使用 `vX.Y.Z`，例如 `v1.0.0`。
 - 版本号以 `package.json` 为准。
 
-## 首次开源版本
+## v1.0 开源版本
 
-建议首次开源版本为 `v0.1.0`。
+建议 v1.0 开源版本为 `v1.0.0`。
 
-### 首次 GitHub Release 内容模板
+### GitHub Release 内容模板
 
 ```markdown
-# Harmony Admin v0.1.0
+# Harmony Admin v1.0.0
 
-首次开源准备版本，包含 React + TypeScript + Vite 管理台前端、演示 Mock 和基础开源协作文件。
+稳定开源前端底座版本，包含 React + TypeScript + Vite 管理台前端、Demo Mock、external API contract 和基础开源协作文件。
 
 ## Highlights
 
 - React + TypeScript + Vite 管理端
 - Tailwind CSS + shadcn/ui 组件体系
 - 用户、角色、权限、租户、菜单、审计日志等管理台界面
-- 本地演示账号与 mock 数据
+- 本地演示账号与 Demo Mock 数据
+- external API contract、Demo 边界、业务模块接入和测试策略文档
 - README、CONTRIBUTING、SECURITY、Issue/PR 模板
 - GitHub Actions 前端 CI
 
 ## Security Notes
 
-- 演示账号仅用于本地 mock 模式。
+- 演示账号仅用于本地 Demo Mock 模式。
 - 示例配置仅使用占位值。
 - 接入真实 API 前应关闭 `VITE_ENABLE_DEMO_MOCKS`。
 
 ## Known Issues
 
-- 仓库不包含后端实现，需要使用方接入自己的 API。
+- 仓库保持 frontend-only，不包含后端实现；生产接入需要使用方提供兼容契约的 external API。
 ```
 
-## 发布前 Checklist
+## Release checklist / 发布前 Checklist
 
 - [ ] `git status` 中没有误暂存系统文件、缓存文件、日志文件。
 - [ ] 已扫描真实密钥、真实账号、Cookie、Token、内部 URL。
 - [ ] README 中的启动步骤可执行。
 - [ ] `CHANGELOG.md` 已更新。
 - [ ] `LICENSE` 已使用 Apache License 2.0。
+- [ ] `LICENSE` 版权主体已由维护者确认；当前文件为 `Copyright 2026 naruto863`。
 - [ ] `npm run lint` 通过。
 - [ ] `npm run typecheck` 通过。
 - [ ] `npm run test` 通过。
 - [ ] `npm run build` 通过。
+- [ ] `npm run security:audit` 通过，或已记录可解释的环境阻塞。
 - [ ] GitHub Actions 在 PR 或主干上通过。
 
 ## 发布命令
 
 ```bash
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
 ```
 
 ## 发布后 Checklist
