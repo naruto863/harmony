@@ -392,6 +392,254 @@ v0.6 继续保持 frontend-only + external API 边界：仓库只提供前端调
 
 真实数据过滤、越权拒绝和跨租户隔离必须由外部 API 兜底。前端数据范围只用于配置、展示和提交，不作为安全边界。
 
+## v1.5 任务调度接口
+
+任务调度能力是 v1.5 长期增强模块。仓库只提供前端页面、服务层调用、Demo 样例和权限码约定，不实现调度器、Worker、分布式锁、执行日志采集或告警投递。
+
+`SchedulerJob` 建议字段：
+
+```json
+{
+  "id": "job_billing_sync",
+  "name": "账单同步",
+  "status": "enabled",
+  "triggerType": "cron",
+  "triggerExpression": "0 */15 * * * ?",
+  "ownerName": "运营团队",
+  "lastResult": "success",
+  "lastRunAt": "2026-06-14T08:00:00Z",
+  "nextRunAt": "2026-06-14T08:15:00Z",
+  "alertEnabled": true
+}
+```
+
+`SchedulerExecution` 建议字段：
+
+```json
+{
+  "id": "exec_1",
+  "jobId": "job_billing_sync",
+  "jobName": "账单同步",
+  "status": "failed",
+  "startedAt": "2026-06-14T08:00:00Z",
+  "finishedAt": "2026-06-14T08:01:00Z",
+  "durationMs": 60000,
+  "traceId": "trace-exec-1",
+  "errorSummary": "外部 API 超时",
+  "retryable": true
+}
+```
+
+接口：
+
+- `GET /api/scheduler/jobs?tenantId={tenantId}&page={page}&size={size}&status={status}&search={search}`：返回任务定义分页，`data` 使用 `list/total/page/size`。
+- `POST /api/scheduler/jobs`：创建任务定义；真实调度参数校验、表达式合法性和冲突检查由外部 API 负责。
+- `PUT /api/scheduler/jobs/{jobId}`：更新任务定义。
+- `PATCH /api/scheduler/jobs/{jobId}/status`：启用、停用或暂停任务。
+- `POST /api/scheduler/jobs/{jobId}/run-once`：请求外部 API 立即执行一次任务，请求体可包含 `tenantId` 和 `reason`。
+- `GET /api/scheduler/executions?tenantId={tenantId}&page={page}&size={size}&status={status}&jobId={jobId}`：返回执行日志分页，`data` 使用 `list/total/page/size`。
+- `GET /api/scheduler/executions/{executionId}`：返回单次执行详情。
+- `POST /api/scheduler/executions/{executionId}/retry`：请求外部 API 重试失败或可重试执行，请求体可包含 `tenantId` 和 `reason`。
+
+写操作建议返回：
+
+```json
+{
+  "accepted": true,
+  "traceId": "trace-command"
+}
+```
+
+外部 API 必须校验当前用户是否具备对应权限，记录立即执行和重试的审计日志，并负责并发控制、任务幂等、失败重试策略和告警投递。前端的按钮权限和菜单权限只做展示级控制。
+
+## v1.5 监控告警接口
+
+监控告警能力是 v1.5 长期增强模块。仓库只提供前端页面、服务层调用、Demo 样例和权限码约定，不实现 Prometheus、APM、日志采集器、健康检查服务或告警引擎。
+
+`MonitoringHealthSummary` 建议字段：
+
+```json
+{
+  "overallStatus": "degraded",
+  "generatedAt": "2026-06-14T09:00:00Z",
+  "services": [
+    {
+      "id": "api-gateway",
+      "name": "API 网关",
+      "status": "healthy",
+      "latencyMs": 32,
+      "errorRate": 0.01,
+      "traceId": "trace-health-api"
+    }
+  ],
+  "latency": [
+    { "path": "/api/users", "p95Ms": 120, "avgMs": 48, "samples": 260 }
+  ],
+  "errorRates": [
+    { "path": "/api/files/upload", "rate": 0.03, "count": 3, "window": "5m" }
+  ]
+}
+```
+
+`MonitoringAlert` 建议字段：
+
+```json
+{
+  "id": "alert_1",
+  "title": "错误率升高",
+  "severity": "critical",
+  "status": "open",
+  "source": "api-gateway",
+  "triggeredAt": "2026-06-14T09:00:00Z",
+  "traceId": "trace-alert-1",
+  "description": "错误率超过阈值"
+}
+```
+
+接口：
+
+- `GET /api/monitoring/health?tenantId={tenantId}`：返回服务健康、接口耗时和错误率聚合结果。
+- `GET /api/monitoring/services?tenantId={tenantId}`：返回服务实例或依赖状态列表。
+- `GET /api/monitoring/api-latency?tenantId={tenantId}`：返回接口耗时聚合指标。
+- `GET /api/monitoring/error-rates?tenantId={tenantId}`：返回错误率聚合指标。
+- `GET /api/monitoring/alert-rules?tenantId={tenantId}`：返回告警规则列表。
+- `POST /api/monitoring/alert-rules`：创建告警规则。
+- `PUT /api/monitoring/alert-rules/{ruleId}`：更新告警规则。
+- `DELETE /api/monitoring/alert-rules/{ruleId}`：删除告警规则。
+- `GET /api/monitoring/alerts?tenantId={tenantId}&page={page}&size={size}&status={status}&severity={severity}`：返回告警历史分页，`data` 使用 `list/total/page/size`。
+- `POST /api/monitoring/alerts/{alertId}/ack`：确认告警，请求体可包含 `tenantId` 和 `note`。
+- `POST /api/monitoring/alerts/{alertId}/resolve`：解决告警，请求体可包含 `tenantId` 和 `note`。
+- `POST /api/monitoring/alerts/{alertId}/silence`：静默告警，请求体可包含 `tenantId` 和 `note`。
+
+外部 API 必须负责指标采集、健康判定、告警触发、通知投递、确认/解决/静默审计和访问控制。前端只展示聚合结果并发起受控管理请求，不能替代真实监控平台或接口级授权。
+
+## v1.5 模块清单接口
+
+模块清单能力是 v1.5 长期增强模块。仓库只定义 compile-time 或配置型 `ModuleManifest`，用于校验路由、菜单、权限、字典、审计事件、功能开关、API 前缀和 Demo 边界；不实现远程插件 marketplace，不加载远程 JS、CSS 或 React 组件。
+
+`ModuleManifest` 建议字段：
+
+```json
+{
+  "key": "scheduler",
+  "name": "任务调度",
+  "version": "1.5.0",
+  "routes": [{ "path": "/scheduler/jobs", "label": "任务定义" }],
+  "menuItems": [{ "id": "scheduler-jobs", "label": "任务定义", "path": "/scheduler/jobs", "permission": "scheduler.jobs.read" }],
+  "permissions": ["scheduler.jobs.read", "scheduler.jobs.execute"],
+  "dictGroups": [],
+  "auditEvents": ["scheduler.jobs.run-once"],
+  "featureFlag": "scheduler.enabled",
+  "apiPrefixes": ["/api/scheduler"],
+  "demoBoundary": "Demo 只展示任务定义和执行日志样例，不执行真实任务。",
+  "remoteRuntime": false
+}
+```
+
+接口：
+
+- `GET /api/modules`：返回当前租户或部署环境可用模块清单。
+- `GET /api/modules/{moduleKey}`：返回单个模块 manifest。
+- `PATCH /api/modules/{moduleKey}/status`：更新模块启停状态；真实强制执行由外部 API 或部署配置完成。
+
+约束：
+
+- `routes[].path` 必须已在前端 `ROUTE_COMPONENTS` 白名单中声明。
+- `menuItems[].permission` 必须进入 manifest 权限集合和公开权限码文档。
+- `apiPrefixes[]` 只能描述外部 API 前缀，不能绕过统一 `apiClient` 和服务层。
+- `remoteRuntime` 必须默认为 `false`；运行时远程插件、远程 JS 和第三方插件市场不属于本仓库默认能力。
+
+## v1.5 工作流与动态表单接口
+
+工作流与动态表单能力是 v1.5 长期增强模块。仓库只提供前端模板、服务层调用、字段白名单和 Demo 样例，不实现流程引擎、节点权限引擎、会签、抄送、超时任务或表单运行时后端。
+
+接口：
+
+- `GET /api/workflows/definitions?tenantId={tenantId}`：返回流程定义列表。
+- `POST /api/workflows/definitions`：创建流程定义。
+- `PUT /api/workflows/definitions/{definitionId}`：更新流程定义。
+- `GET /api/workflows/instances?tenantId={tenantId}&page={page}&size={size}&status={status}`：返回流程实例分页，`data` 使用 `list/total/page/size`。
+- `POST /api/workflows/instances`：发起流程实例，请求体包含 `definitionId`、`tenantId`、`title` 和 `formData`。
+- `POST /api/workflows/tasks/{taskId}/approve`：审批流程任务。
+- `POST /api/workflows/tasks/{taskId}/reject`：驳回流程任务。
+- `GET /api/dynamic-forms/schemas?tenantId={tenantId}`：返回动态表单 schema 列表。
+- `POST /api/dynamic-forms/schemas`：创建动态表单 schema。
+- `PUT /api/dynamic-forms/schemas/{schemaId}`：更新动态表单 schema。
+- `POST /api/dynamic-forms/schemas/{schemaId}/preview`：预览动态表单渲染结果。
+
+动态表单字段类型白名单：
+
+```text
+text, textarea, number, select, date, switch, upload, user-picker, dept-picker
+```
+
+字段联动只能使用受限配置表达式，不能执行任意 JavaScript、访问 `window`/`document`、读取 token 或调用远程脚本。表单提交错误继续使用 `422 fieldErrors`，例如：
+
+```json
+{
+  "code": 422,
+  "message": "参数校验失败",
+  "data": {
+    "fieldErrors": {
+      "days": ["请假天数必须大于 0"]
+    }
+  },
+  "traceId": "trace-workflow-form"
+}
+```
+
+流程执行、节点权限、会签、历史真实性、表单数据持久化和附件处理必须由外部 API 或工作流平台负责。前端权限只做展示级控制。
+
+## v1.5 数据维护与 SaaS 扩展接口
+
+数据维护与 SaaS 扩展能力是 v1.5 长期增强模块。仓库只提供前端受控入口、服务层调用、Demo 样例和权限码约定，不实现 SQL 控制台、任意缓存 key 删除、支付账单、计量后端或真实配额强制执行。
+
+### 数据维护资源
+
+维护资源由外部 API 预注册，前端只能读取资源清单并提交受控命令：
+
+- `GET /api/maintenance/resources?tenantId={tenantId}&page={page}&size={size}&type={type}`：返回维护资源分页，`data` 使用 `list/total/page/size`。
+- `POST /api/maintenance/resources/{resourceId}/refresh`：刷新受控资源，请求体包含 `tenantId`、`reason` 和 `confirmationText`。
+- `POST /api/maintenance/cache/{resourceId}/clear`：清理预注册缓存资源。
+- `POST /api/maintenance/reference-data/{resourceId}/sync`：同步基础数据、地区或行业分类。
+
+维护资源示例：
+
+```json
+{
+  "id": "cache_menu_tree",
+  "name": "菜单树缓存",
+  "type": "cache",
+  "status": "healthy",
+  "scope": "tenant",
+  "auditRequired": true,
+  "allowedOperations": ["refresh", "clear"]
+}
+```
+
+前端不得提交任意 SQL、任意脚本或任意缓存 key。危险操作必须同时满足权限、二次确认和 external API 审计留痕。
+
+### SaaS 套餐与配额
+
+- `GET /api/saas/plans?tenantId={tenantId}`：返回套餐、模块可用性和审计留存周期。
+- `GET /api/saas/quotas?tenantId={tenantId}`：返回配额使用情况，配额强制执行由 external API 完成。
+- `POST /api/saas/modules/{moduleCode}/toggle`：请求启停模块，请求体包含 `tenantId`、`enabled`、`reason` 和 `confirmationText`。
+
+SaaS 配额示例：
+
+```json
+{
+  "key": "members",
+  "label": "成员数",
+  "used": 8,
+  "limit": 50,
+  "unit": "人",
+  "enforcedBy": "external-api"
+}
+```
+
+套餐、配额、模块启停和审计留存周期在前端只做展示和受控命令提交；真实计费、套餐变更、配额拒绝和审计保留策略必须由外部 API 或 SaaS 平台执行。
+
 ## 权限码
 
 v1.0 当前 Demo 数据、菜单和服务层使用以下权限码。新增业务模块应继续优先采用 `<resource>.<action>` 形式。
@@ -407,9 +655,32 @@ v1.0 当前 Demo 数据、菜单和服务层使用以下权限码。新增业务
 | 租户 | `tenant.manage` | 租户设置和成员治理入口 |
 | 岗位 | `positions.create`、`positions.read`、`positions.update`、`positions.delete` | 岗位管理入口和按钮 |
 | 用户组 | `user-groups.create`、`user-groups.read`、`user-groups.update`、`user-groups.delete` | 用户组管理入口和按钮 |
+| 任务调度 | `scheduler.jobs.read`、`scheduler.jobs.execute`、`scheduler.executions.read`、`scheduler.executions.retry` | 任务定义、立即执行、执行日志和失败重试入口 |
+| 监控告警 | `monitoring.health.read`、`monitoring.metrics.read`、`monitoring.alerts.read`、`monitoring.alerts.manage`、`monitoring.alert-rules.manage` | 健康状态、指标、告警历史和告警规则管理入口 |
+| 模块清单 | `modules.read`、`modules.manage` | ModuleManifest 清单、校验和模块启停入口 |
+| 工作流 | `workflows.definitions.read`、`workflows.instances.read`、`workflows.instances.start`、`workflows.tasks.approve`、`workflows.tasks.reject` | 流程定义、流程实例、发起流程和审批任务入口 |
+| 动态表单 | `forms.schemas.read`、`forms.schemas.preview` | 动态表单 schema 和预览入口 |
+| 数据维护 | `maintenance.resources.read`、`maintenance.cache.clear`、`maintenance.reference-data.sync` | 维护资源清单、受控缓存清理和基础数据同步入口 |
+| SaaS 扩展 | `saas.plans.read`、`saas.quotas.read`、`saas.modules.toggle` | 套餐、配额、模块启停和审计留存入口 |
 
 按钮和菜单可见性由前端使用这些权限码做展示级控制；外部 API 必须在接口层做真实授权、租户隔离、数据范围过滤和越权拒绝。前端角色表单提交的 `dataScopeType` 与 `dataScopeDeptIds` 只表示配置意图，不表示前端已经完成真实数据授权。
 
 ## OpenAPI
 
-仓库不生成也不托管 OpenAPI 文档。接入真实 API 时，建议使用方提供 OpenAPI/Swagger 或等价接口文档，并保持接口路径、鉴权方式、错误码和分页结构稳定。
+仓库不生成也不托管外部 API 的权威 OpenAPI 文档。接入真实 API 时，建议使用方提供 OpenAPI/Swagger 或等价接口文档，并保持接口路径、鉴权方式、错误码和分页结构稳定。
+
+v1.5 提供 `/developer/openapi` 作为纯前端草稿辅助入口，用于从接入方粘贴的 OpenAPI/Swagger JSON 中生成以下预览建议：
+
+- route 草稿，例如 `/orders`。
+- `developer.openapi.*` 或业务模块自己的 `<module>.<action>` 权限码建议。
+- 菜单草稿和模块 key 建议。
+- service 方法草稿，例如 `listOrders`、`createOrder`、`updateOrder`、`deleteOrder`。
+- API 契约差异提醒和敏感信息脱敏提醒。
+
+该能力默认遵守以下边界：
+
+- 只生成草稿预览，不自动写入文件。
+- 不执行远程 schema 中携带的脚本或示例代码。
+- 不默认引入 OpenAPI codegen 重型依赖。
+- 不把生成结果直接视为生产可用实现。
+- 如果 OpenAPI `servers.url`、示例请求体或描述中包含真实内网地址、密钥、账号、手机号、邮箱等敏感信息，接入方必须先脱敏再用于公开文档或 Demo。

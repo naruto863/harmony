@@ -115,6 +115,54 @@ export const LazyLoginLogsPage = lazyLoad(
   <TableSkeleton />
 );
 
+// 任务调度
+export const LazySchedulerJobsPage = lazyLoad(
+  () => import('@/pages/scheduler/SchedulerJobsPage').then(m => ({ default: m.SchedulerJobsPage })),
+  <TableSkeleton />
+);
+
+export const LazySchedulerExecutionsPage = lazyLoad(
+  () => import('@/pages/scheduler/SchedulerExecutionsPage').then(m => ({ default: m.SchedulerExecutionsPage })),
+  <TableSkeleton />
+);
+
+// 监控告警
+export const LazyMonitoringHealthPage = lazyLoad(
+  () => import('@/pages/monitoring/MonitoringHealthPage').then(m => ({ default: m.MonitoringHealthPage })),
+  <TableSkeleton />
+);
+
+export const LazyMonitoringAlertsPage = lazyLoad(
+  () => import('@/pages/monitoring/MonitoringAlertsPage').then(m => ({ default: m.MonitoringAlertsPage })),
+  <TableSkeleton />
+);
+
+// 开发者工具
+export const LazyOpenApiDraftPage = lazyLoad(
+  () => import('@/pages/developer/OpenApiDraftPage').then(m => ({ default: m.OpenApiDraftPage })),
+  <PageLoader />
+);
+
+export const LazyModulesPage = lazyLoad(
+  () => import('@/pages/modules/ModulesPage').then(m => ({ default: m.ModulesPage })),
+  <TableSkeleton />
+);
+
+export const LazyWorkflowsPage = lazyLoad(
+  () => import('@/pages/workflows/WorkflowsPage').then(m => ({ default: m.WorkflowsPage })),
+  <TableSkeleton />
+);
+
+export const LazyDynamicFormsPage = lazyLoad(
+  () => import('@/pages/workflows/DynamicFormsPage').then(m => ({ default: m.DynamicFormsPage })),
+  <TableSkeleton />
+);
+
+export const LazyMaintenancePage = lazyLoad(
+  () => import('@/pages/maintenance/MaintenancePage').then(m => ({ default: m.MaintenancePage })),
+  <TableSkeleton />
+);
+
 // 设置页面
 export const LazyProfileSettings = lazyLoad(
   () => import('@/pages/settings/ProfileSettings').then(m => ({ default: m.ProfileSettings })),

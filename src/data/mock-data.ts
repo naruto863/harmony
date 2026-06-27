@@ -11,6 +11,11 @@ import {
   Position,
   UserGroup,
 } from '@/types';
+import type { MonitoringAlert, MonitoringHealthSummary } from '@/types/monitoring';
+import type { SchedulerExecution, SchedulerJob } from '@/types/scheduler';
+import type { DynamicFormSchema, WorkflowDefinition, WorkflowInstance } from '@/types/workflow';
+import type { MaintenanceResource } from '@/types/maintenance';
+import type { SaasPlan, SaasQuotaUsage } from '@/types/saas';
 
 // ==================== 权限定义 ====================
 export const PERMISSIONS: Permission[] = [
@@ -50,6 +55,38 @@ export const PERMISSIONS: Permission[] = [
   { id: 'settings.update', resource: 'settings', action: 'update', description: '修改设置' },
   // 租户管理
   { id: 'tenant.manage', resource: 'tenant', action: 'manage', description: '管理租户' },
+  // 任务调度
+  { id: 'scheduler.jobs.read', resource: 'scheduler.jobs', action: 'read', description: '查看任务定义' },
+  { id: 'scheduler.jobs.execute', resource: 'scheduler.jobs', action: 'execute', description: '立即执行任务' },
+  { id: 'scheduler.executions.read', resource: 'scheduler.executions', action: 'read', description: '查看执行日志' },
+  { id: 'scheduler.executions.retry', resource: 'scheduler.executions', action: 'retry', description: '重试失败任务' },
+  // 监控告警
+  { id: 'monitoring.health.read', resource: 'monitoring.health', action: 'read', description: '查看健康状态' },
+  { id: 'monitoring.metrics.read', resource: 'monitoring.metrics', action: 'read', description: '查看监控指标' },
+  { id: 'monitoring.alerts.read', resource: 'monitoring.alerts', action: 'read', description: '查看告警历史' },
+  { id: 'monitoring.alerts.manage', resource: 'monitoring.alerts', action: 'manage', description: '管理告警' },
+  { id: 'monitoring.alert-rules.manage', resource: 'monitoring.alert-rules', action: 'manage', description: '管理告警规则' },
+  // 开发者工具
+  { id: 'developer.openapi.read', resource: 'developer.openapi', action: 'read', description: '查看 OpenAPI 草稿' },
+  { id: 'developer.openapi.manage', resource: 'developer.openapi', action: 'manage', description: '生成 OpenAPI 草稿建议' },
+  // 模块清单
+  { id: 'modules.read', resource: 'modules', action: 'read', description: '查看模块清单' },
+  { id: 'modules.manage', resource: 'modules', action: 'manage', description: '管理模块 manifest' },
+  // 工作流与动态表单
+  { id: 'workflows.definitions.read', resource: 'workflows.definitions', action: 'read', description: '查看流程定义' },
+  { id: 'workflows.instances.read', resource: 'workflows.instances', action: 'read', description: '查看流程实例' },
+  { id: 'workflows.instances.start', resource: 'workflows.instances', action: 'start', description: '发起流程' },
+  { id: 'workflows.tasks.approve', resource: 'workflows.tasks', action: 'approve', description: '审批流程任务' },
+  { id: 'workflows.tasks.reject', resource: 'workflows.tasks', action: 'reject', description: '驳回流程任务' },
+  { id: 'forms.schemas.read', resource: 'forms.schemas', action: 'read', description: '查看动态表单' },
+  { id: 'forms.schemas.preview', resource: 'forms.schemas', action: 'preview', description: '预览动态表单' },
+  // 数据维护与 SaaS 扩展
+  { id: 'maintenance.resources.read', resource: 'maintenance.resources', action: 'read', description: '查看维护资源' },
+  { id: 'maintenance.cache.clear', resource: 'maintenance.cache', action: 'clear', description: '清理受控缓存' },
+  { id: 'maintenance.reference-data.sync', resource: 'maintenance.reference-data', action: 'sync', description: '同步基础数据' },
+  { id: 'saas.plans.read', resource: 'saas.plans', action: 'read', description: '查看 SaaS 套餐' },
+  { id: 'saas.quotas.read', resource: 'saas.quotas', action: 'read', description: '查看 SaaS 配额' },
+  { id: 'saas.modules.toggle', resource: 'saas.modules', action: 'toggle', description: '切换 SaaS 模块' },
 ];
 
 // ==================== 权限分组 ====================
@@ -98,6 +135,96 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     resource: 'tenant',
     label: '租户管理',
     permissions: PERMISSIONS.filter(p => p.resource === 'tenant'),
+  },
+  {
+    resource: 'scheduler.jobs',
+    label: '任务定义',
+    permissions: PERMISSIONS.filter(p => p.resource === 'scheduler.jobs'),
+  },
+  {
+    resource: 'scheduler.executions',
+    label: '执行日志',
+    permissions: PERMISSIONS.filter(p => p.resource === 'scheduler.executions'),
+  },
+  {
+    resource: 'monitoring.health',
+    label: '监控健康',
+    permissions: PERMISSIONS.filter(p => p.resource === 'monitoring.health'),
+  },
+  {
+    resource: 'monitoring.metrics',
+    label: '监控指标',
+    permissions: PERMISSIONS.filter(p => p.resource === 'monitoring.metrics'),
+  },
+  {
+    resource: 'monitoring.alerts',
+    label: '监控告警',
+    permissions: PERMISSIONS.filter(p => p.resource === 'monitoring.alerts'),
+  },
+  {
+    resource: 'monitoring.alert-rules',
+    label: '告警规则',
+    permissions: PERMISSIONS.filter(p => p.resource === 'monitoring.alert-rules'),
+  },
+  {
+    resource: 'developer.openapi',
+    label: 'OpenAPI 辅助',
+    permissions: PERMISSIONS.filter(p => p.resource === 'developer.openapi'),
+  },
+  {
+    resource: 'modules',
+    label: '模块清单',
+    permissions: PERMISSIONS.filter(p => p.resource === 'modules'),
+  },
+  {
+    resource: 'workflows.definitions',
+    label: '流程定义',
+    permissions: PERMISSIONS.filter(p => p.resource === 'workflows.definitions'),
+  },
+  {
+    resource: 'workflows.instances',
+    label: '流程实例',
+    permissions: PERMISSIONS.filter(p => p.resource === 'workflows.instances'),
+  },
+  {
+    resource: 'workflows.tasks',
+    label: '流程任务',
+    permissions: PERMISSIONS.filter(p => p.resource === 'workflows.tasks'),
+  },
+  {
+    resource: 'forms.schemas',
+    label: '动态表单',
+    permissions: PERMISSIONS.filter(p => p.resource === 'forms.schemas'),
+  },
+  {
+    resource: 'maintenance.resources',
+    label: '维护资源',
+    permissions: PERMISSIONS.filter(p => p.resource === 'maintenance.resources'),
+  },
+  {
+    resource: 'maintenance.cache',
+    label: '缓存维护',
+    permissions: PERMISSIONS.filter(p => p.resource === 'maintenance.cache'),
+  },
+  {
+    resource: 'maintenance.reference-data',
+    label: '基础数据维护',
+    permissions: PERMISSIONS.filter(p => p.resource === 'maintenance.reference-data'),
+  },
+  {
+    resource: 'saas.plans',
+    label: 'SaaS 套餐',
+    permissions: PERMISSIONS.filter(p => p.resource === 'saas.plans'),
+  },
+  {
+    resource: 'saas.quotas',
+    label: 'SaaS 配额',
+    permissions: PERMISSIONS.filter(p => p.resource === 'saas.quotas'),
+  },
+  {
+    resource: 'saas.modules',
+    label: 'SaaS 模块',
+    permissions: PERMISSIONS.filter(p => p.resource === 'saas.modules'),
   },
 ];
 
@@ -457,6 +584,225 @@ export const USER_GROUP_MEMBERS: Record<string, string[]> = {
   group_product: ['user_admin', 'user_viewer'],
 };
 
+// ==================== v1.5 任务调度演示数据 ====================
+export const SCHEDULER_JOBS: SchedulerJob[] = [
+  {
+    id: 'job_billing_sync',
+    name: '账单同步',
+    status: 'enabled',
+    triggerType: 'cron',
+    triggerExpression: '0 */15 * * * ?',
+    ownerName: '运营团队',
+    lastResult: 'success',
+    lastRunAt: '2026-06-14T08:00:00Z',
+    nextRunAt: '2026-06-14T08:15:00Z',
+    alertEnabled: true,
+  },
+  {
+    id: 'job_audit_archive',
+    name: '审计归档',
+    status: 'paused',
+    triggerType: 'cron',
+    triggerExpression: '0 0 2 * * ?',
+    ownerName: '平台管理员',
+    lastResult: 'failed',
+    lastRunAt: '2026-06-14T02:00:00Z',
+    nextRunAt: null,
+    alertEnabled: true,
+  },
+];
+
+export const SCHEDULER_EXECUTIONS: SchedulerExecution[] = [
+  {
+    id: 'exec_billing_sync_001',
+    jobId: 'job_billing_sync',
+    jobName: '账单同步',
+    status: 'success',
+    startedAt: '2026-06-14T08:00:00Z',
+    finishedAt: '2026-06-14T08:00:18Z',
+    durationMs: 18000,
+    traceId: 'trace-scheduler-demo-001',
+    retryable: false,
+  },
+  {
+    id: 'exec_audit_archive_001',
+    jobId: 'job_audit_archive',
+    jobName: '审计归档',
+    status: 'failed',
+    startedAt: '2026-06-14T02:00:00Z',
+    finishedAt: '2026-06-14T02:01:00Z',
+    durationMs: 60000,
+    traceId: 'trace-scheduler-demo-002',
+    errorSummary: '外部归档 API 超时',
+    retryable: true,
+  },
+];
+
+// ==================== v1.5 监控告警演示数据 ====================
+export const MONITORING_HEALTH: MonitoringHealthSummary = {
+  overallStatus: 'degraded',
+  generatedAt: '2026-06-14T09:00:00Z',
+  services: [
+    {
+      id: 'api-gateway',
+      name: 'API 网关',
+      status: 'healthy',
+      latencyMs: 32,
+      errorRate: 0.01,
+      traceId: 'trace-health-api',
+    },
+    {
+      id: 'file-service',
+      name: '文件服务',
+      status: 'degraded',
+      latencyMs: 380,
+      errorRate: 0.03,
+      traceId: 'trace-health-file',
+    },
+  ],
+  latency: [
+    { path: '/api/users', p95Ms: 120, avgMs: 48, samples: 260 },
+    { path: '/api/files/upload', p95Ms: 420, avgMs: 180, samples: 52 },
+  ],
+  errorRates: [
+    { path: '/api/files/upload', rate: 0.03, count: 3, window: '5m' },
+    { path: '/api/scheduler/jobs', rate: 0.01, count: 1, window: '5m' },
+  ],
+};
+
+export const MONITORING_ALERTS: MonitoringAlert[] = [
+  {
+    id: 'alert_1',
+    title: '错误率升高',
+    severity: 'critical',
+    status: 'open',
+    source: 'api-gateway',
+    triggeredAt: '2026-06-14T09:00:00Z',
+    traceId: 'trace-alert-1',
+    description: 'Demo 样例：外部 API 聚合后的错误率告警。',
+  },
+  {
+    id: 'alert_2',
+    title: '文件服务延迟升高',
+    severity: 'warning',
+    status: 'acknowledged',
+    source: 'file-service',
+    triggeredAt: '2026-06-14T08:45:00Z',
+    traceId: 'trace-alert-2',
+  },
+];
+
+// ==================== v1.5 工作流与动态表单演示数据 ====================
+export const WORKFLOW_DEFINITIONS: WorkflowDefinition[] = [
+  {
+    id: 'wf_leave',
+    name: '请假审批',
+    status: 'active',
+    version: 1,
+    description: 'Demo 样例：外部工作流引擎提供流程执行。',
+  },
+];
+
+export const WORKFLOW_INSTANCES: WorkflowInstance[] = [
+  {
+    id: 'inst_1',
+    definitionId: 'wf_leave',
+    title: '年假申请',
+    status: 'running',
+    currentNodeName: '部门审批',
+    traceId: 'trace-workflow-demo-1',
+  },
+];
+
+export const DYNAMIC_FORM_SCHEMAS: DynamicFormSchema[] = [
+  {
+    id: 'form_leave',
+    name: '请假表单',
+    version: 1,
+    status: 'active',
+    fields: [
+      { key: 'reason', label: '请假原因', type: 'textarea', required: true },
+      { key: 'days', label: '请假天数', type: 'number', required: true },
+      { key: 'handoverUser', label: '工作交接人', type: 'user-picker' },
+    ],
+  },
+];
+
+// ==================== v1.5 数据维护与 SaaS 演示数据 ====================
+export const MAINTENANCE_RESOURCES: MaintenanceResource[] = [
+  {
+    id: 'cache_menu_tree',
+    name: '菜单树缓存',
+    type: 'cache',
+    status: 'healthy',
+    scope: 'tenant',
+    updatedAt: '2026-06-14T08:00:00Z',
+    ownerName: '平台管理员',
+    auditRequired: true,
+    allowedOperations: ['refresh', 'clear'],
+    description: '仅允许清理预注册的菜单树缓存，不支持任意 key 删除。',
+  },
+  {
+    id: 'ref_region_cn',
+    name: '地区基础数据',
+    type: 'reference-data',
+    status: 'stale',
+    scope: 'global',
+    updatedAt: '2026-06-13T08:00:00Z',
+    ownerName: '数据治理',
+    auditRequired: true,
+    allowedOperations: ['sync'],
+    description: '地区字典由外部 API 校验来源、版本和同步窗口。',
+  },
+  {
+    id: 'ref_industry_catalog',
+    name: '行业分类',
+    type: 'industry',
+    status: 'healthy',
+    scope: 'global',
+    updatedAt: '2026-06-12T08:00:00Z',
+    ownerName: '运营团队',
+    auditRequired: true,
+    allowedOperations: ['sync'],
+  },
+];
+
+export const SAAS_QUOTA_USAGE: SaasQuotaUsage[] = [
+  { key: 'members', label: '成员数', used: 8, limit: 50, unit: '人', enforcedBy: 'external-api' },
+  { key: 'storage', label: '存储空间', used: 18, limit: 200, unit: 'GB', enforcedBy: 'external-api' },
+  { key: 'workflowInstances', label: '流程实例', used: 36, limit: 1000, unit: '个', enforcedBy: 'external-api' },
+];
+
+export const SAAS_PLANS: SaasPlan[] = [
+  {
+    id: 'free',
+    name: '免费版',
+    tier: 'free',
+    priceLabel: '免费',
+    auditRetentionDays: 30,
+    quotas: SAAS_QUOTA_USAGE.slice(0, 1),
+    moduleCodes: ['projects', 'files'],
+  },
+  {
+    id: 'pro',
+    name: '专业版',
+    tier: 'pro',
+    priceLabel: '按月订阅',
+    auditRetentionDays: 180,
+    quotas: SAAS_QUOTA_USAGE.slice(0, 2),
+    moduleCodes: ['projects', 'files', 'scheduler'],
+  },
+  {
+    id: 'enterprise',
+    name: '企业版',
+    tier: 'enterprise',
+    priceLabel: '联系销售',
+    auditRetentionDays: 365,
+    quotas: SAAS_QUOTA_USAGE,
+    moduleCodes: ['projects', 'files', 'scheduler', 'monitoring', 'workflows'],
+  },
+];
+
 // ==================== 菜单配置 ====================
 export const MENU_ITEMS: MenuItem[] = [
   {
@@ -539,6 +885,51 @@ export const MENU_ITEMS: MenuItem[] = [
     label: '消息中心',
     icon: 'MessageSquare',
     path: '/messages',
+  },
+  {
+    id: 'scheduler',
+    label: '任务调度',
+    icon: 'Monitor',
+    children: [
+      { id: 'scheduler-jobs', label: '任务定义', icon: 'ToggleRight', path: '/scheduler/jobs', permission: 'scheduler.jobs.read' },
+      { id: 'scheduler-executions', label: '执行日志', icon: 'ScrollText', path: '/scheduler/executions', permission: 'scheduler.executions.read' },
+    ],
+  },
+  {
+    id: 'monitoring',
+    label: '监控告警',
+    icon: 'BarChart3',
+    children: [
+      { id: 'monitoring-health', label: '健康状态', icon: 'Monitor', path: '/monitoring/health', permission: 'monitoring.health.read' },
+      { id: 'monitoring-alerts', label: '告警历史', icon: 'Bell', path: '/monitoring/alerts', permission: 'monitoring.alerts.read' },
+    ],
+  },
+  {
+    id: 'developer',
+    label: '开发者工具',
+    icon: 'BookOpen',
+    children: [
+      { id: 'developer-openapi', label: 'OpenAPI 辅助', icon: 'BookOpen', path: '/developer/openapi', permission: 'developer.openapi.read' },
+      { id: 'modules', label: '模块清单', icon: 'SlidersHorizontal', path: '/modules', permission: 'modules.read' },
+    ],
+  },
+  {
+    id: 'workflow-forms',
+    label: '流程表单',
+    icon: 'ScrollText',
+    children: [
+      { id: 'workflows', label: '工作流模板', icon: 'ScrollText', path: '/workflows', permission: 'workflows.definitions.read' },
+      { id: 'dynamic-forms', label: '动态表单', icon: 'BookOpen', path: '/dynamic-forms', permission: 'forms.schemas.read' },
+    ],
+  },
+  {
+    id: 'maintenance-saas',
+    label: '维护与套餐',
+    icon: 'SlidersHorizontal',
+    children: [
+      { id: 'maintenance-cache', label: '缓存管理', icon: 'SlidersHorizontal', path: '/maintenance/cache', permission: 'maintenance.resources.read' },
+      { id: 'saas-plans', label: '套餐与配额', icon: 'ToggleRight', path: '/saas/plans', permission: 'saas.plans.read' },
+    ],
   },
   {
     id: 'settings',

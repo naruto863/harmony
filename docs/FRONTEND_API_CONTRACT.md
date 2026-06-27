@@ -85,8 +85,89 @@
 | 租户设置 | `tenantService`、`settingsService` | `/api/tenants/mine`、`/api/tenants/switch`、`/api/tenants`、`/api/tenants/{tenantId}`、`/api/tenants/{tenantId}/members` | `tenant.manage` 只控制前端入口，真实隔离和成员授权由外部 API 执行 |
 | 个人资料与密码 | `settingsService` | `/api/users/me`、`/api/users/me/password`、`/api/files/upload` | avatar 上传复用文件上传入口 |
 | 会话管理 | `security/sessionService` | `/api/sessions`、`/api/sessions/{sessionId}`、`/api/sessions/others` | 会话吊销需要外部 API 真实失效 refresh token 或服务端会话 |
+| 任务调度 | `schedulerService` | `/api/scheduler/jobs`、`/api/scheduler/jobs/{jobId}/run-once`、`/api/scheduler/executions`、`/api/scheduler/executions/{executionId}/retry` | `scheduler.*` 只控制前端入口；真实调度、并发控制、执行日志、重试和审计由外部 API 执行 |
+| 监控告警 | `monitoringService` | `/api/monitoring/health`、`/api/monitoring/alerts`、`/api/monitoring/alerts/{alertId}/ack`、`/api/monitoring/alerts/{alertId}/resolve`、`/api/monitoring/alerts/{alertId}/silence` | `monitoring.*` 只控制前端入口；指标采集、健康判定、告警触发和通知投递由外部监控平台或 API 执行 |
+| OpenAPI 辅助 | `openapiDraftService` | 纯前端解析，不访问外部 API | `developer.openapi.*` 只控制草稿预览入口；不写文件、不执行远程脚本、不默认引入 codegen |
+| 模块清单 | `module-manifest` | `/api/modules`、`/api/modules/{moduleKey}`、`/api/modules/{moduleKey}/status` | `modules.*` 只控制前端入口；只支持 compile-time/配置型 manifest，不支持运行时远程插件 |
+| 工作流/动态表单 | `workflowService`、`dynamicFormService` | `/api/workflows/*`、`/api/dynamic-forms/*` | `workflows.*`、`forms.*` 只控制前端入口；流程执行、节点权限、字段校验和历史真实性由 external API 执行 |
+| 数据维护/SaaS | `maintenanceService`、`saasService` | `/api/maintenance/*`、`/api/saas/*` | `maintenance.*`、`saas.*` 只控制前端入口；危险操作、真实配额和审计留存由 external API 执行 |
 
 当前 `settingsService` 的通知偏好和功能开关、`securityService` 的 IP 白名单、登录锁定、异常检测等能力仍以本地存储或前端演示为主；关闭 Demo Mock 后，除非接入方自行提供相应 API，否则不应被描述成生产安全能力。
+
+### v1.5 任务调度服务层入口
+
+任务调度页面使用 `schedulerService` 访问外部 API：
+
+- `getSchedulerJobs`：读取 `/api/scheduler/jobs`，把 `list/total/page/size` 归一为页面使用的 `data/meta`。
+- `getSchedulerExecutions`：读取 `/api/scheduler/executions`，保留 `traceId`、错误摘要和可重试标记。
+- `runSchedulerJobOnce`：调用 `/api/scheduler/jobs/{jobId}/run-once`，前端只提交受控请求。
+- `retrySchedulerExecution`：调用 `/api/scheduler/executions/{executionId}/retry`，真实重试和审计由 external API 负责。
+
+页面层不得直接读取 scheduler 原始 envelope；立即执行和重试入口必须保留权限码、确认步骤、错误提示和 TraceId 传播能力。
+
+### v1.5 监控告警服务层入口
+
+监控告警页面使用 `monitoringService` 访问外部 API：
+
+- `getMonitoringHealth`：读取 `/api/monitoring/health`，展示服务健康、接口耗时、错误率和 TraceId。
+- `getMonitoringAlerts`：读取 `/api/monitoring/alerts`，把 `list/total/page/size` 归一为页面使用的 `data/meta`。
+- `acknowledgeMonitoringAlert`：调用 `/api/monitoring/alerts/{alertId}/ack`，前端只提交确认请求。
+- `resolveMonitoringAlert`：调用 `/api/monitoring/alerts/{alertId}/resolve`，真实状态变更和审计由 external API 负责。
+- `silenceMonitoringAlert`：调用 `/api/monitoring/alerts/{alertId}/silence`，静默策略由 external API 校验和执行。
+
+页面层不得把 `src/pages/data-screen/DataScreenPage.tsx` 的演示数据视为生产监控源；真实健康判定、指标采集、告警规则和告警历史必须来自外部 API 或监控平台。
+
+### v1.5 OpenAPI 草稿服务入口
+
+OpenAPI 辅助页面使用 `openapiDraftService` 在浏览器内解析用户粘贴的 OpenAPI/Swagger JSON：
+
+- `buildOpenApiModuleDraft`：生成 route、permission、menu 和 service 方法草稿。
+- `writePolicy` 固定为 `preview-only`，表示不写入源码和文档。
+- 检测到 `servers.url` 时提示脱敏，避免把真实内网地址或敏感示例带入公开文档。
+
+该能力不替代人工代码评审，也不改变 `apiClient`、服务层、权限守卫和 Demo 边界。后续如果要引入 OpenAPI codegen 或自动写文件，必须单独评估依赖、风险和用户确认。
+
+### v1.5 模块 Manifest 入口
+
+模块清单页面使用 `src/modules/module-manifest.ts` 中的 `ModuleManifest` 和 `validateModuleManifest` 做静态校验：
+
+- 校验 route 是否在 `ROUTE_COMPONENTS` 白名单中声明。
+- 校验菜单权限是否进入 manifest 权限集合。
+- 校验 API 前缀是否使用 `/api/`。
+- 明确拒绝 `remoteRuntime`、`remoteEntry`、运行时远程插件和远程 JS 加载。
+
+如果接入方需要从外部 API 获取 `/api/modules` 清单，也必须把结果映射到本地已声明路由和 service 层，不能让 manifest 绕过权限守卫、token 存储、租户上下文或 `apiClient`。
+
+### v1.5 工作流与动态表单服务层入口
+
+工作流页面使用 `workflowService`，动态表单页面使用 `dynamicFormService`：
+
+- `getWorkflowDefinitions`：读取 `/api/workflows/definitions`。
+- `getWorkflowInstances`：读取 `/api/workflows/instances`，把 `list/total/page/size` 归一为页面使用的 `data/meta`。
+- `startWorkflowInstance`：调用 `/api/workflows/instances`，前端只提交受控 `formData`。
+- `approveWorkflowTask` / `rejectWorkflowTask`：调用 `/api/workflows/tasks/{taskId}/approve|reject`。
+- `getDynamicFormSchemas`：读取 `/api/dynamic-forms/schemas`。
+- `previewDynamicFormSchema`：调用 `/api/dynamic-forms/schemas/{schemaId}/preview`。
+- `validateDynamicFormSchema`：校验字段类型白名单，并拒绝任意 JavaScript 表达式。
+
+动态表单提交错误继续沿用 `422 fieldErrors`；页面层不得直接读取原始 envelope。审批流执行、节点权限、会签、抄送、超时、历史真实性和数据持久化必须由 external API 负责。
+
+### v1.5 数据维护与 SaaS 服务层入口
+
+数据维护页面使用 `maintenanceService` 访问外部 API：
+
+- `getMaintenanceResources`：读取 `/api/maintenance/resources`，把 `list/total/page/size` 归一为页面使用的 `data/meta`。
+- `refreshMaintenanceResource`：调用 `/api/maintenance/resources/{resourceId}/refresh`。
+- `clearMaintenanceCache`：调用 `/api/maintenance/cache/{resourceId}/clear`，只接受预注册资源 ID，不接收任意缓存 key。
+- `syncMaintenanceReferenceData`：调用 `/api/maintenance/reference-data/{resourceId}/sync`。
+
+SaaS 展示和模块启停使用 `saasService`：
+
+- `getSaasPlans`：读取 `/api/saas/plans`，展示套餐、模块和审计留存周期。
+- `getSaasQuotaUsage`：读取 `/api/saas/quotas`，展示配额使用量和 `enforcedBy: external-api`。
+- `updateSaasModuleToggle`：调用 `/api/saas/modules/{moduleCode}/toggle`，真实套餐、配额和模块启停校验由 external API 完成。
+
+页面层不得提供 SQL 控制台、任意脚本、任意缓存 key 删除、支付账单处理或真实配额强制执行。危险操作必须保留权限码、二次确认、原因字段、TraceId 和 external API 审计边界。
 
 ### 权限与数据范围边界
 

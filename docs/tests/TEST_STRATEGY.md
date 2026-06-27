@@ -43,6 +43,31 @@
 - `src/pages/auth/AuthPages.test.tsx`：覆盖登录页 Demo 账号提示和租户选择页渲染。
 - `src/pages/page-smoke.test.tsx`：覆盖用户、角色、文件和消息中心页面的最小渲染 smoke，服务层使用 mock，避免真实网络依赖。
 
+## v1.5 长期增强测试矩阵
+
+v1.5 模块仍按 frontend-only + external API 边界测试，不接入真实调度器、监控平台、工作流引擎、插件运行时、支付计费或 SaaS 计量后端。
+
+| 模块 | 自动化测试入口 | 文档静态检查 | 人工验收重点 |
+| --- | --- | --- | --- |
+| 任务调度 | `src/services/schedulerService.test.ts`、`src/pages/scheduler/scheduler-pages.test.tsx` | `/api/scheduler`、`scheduler.*`、任务执行边界 | `/scheduler/jobs` 与 `/scheduler/executions` 的读写入口、二次确认和外部 API 错误 |
+| 监控告警 | `src/services/monitoringService.test.ts`、`src/pages/monitoring/monitoring-pages.test.tsx` | `/api/monitoring`、`monitoring.*`、TraceId、可观测性 | 健康状态、告警历史、确认/解决/静默入口和脱敏展示 |
+| OpenAPI 辅助 | `src/services/openapiDraftService.test.ts`、`src/pages/developer/openapi.test.tsx` | OpenAPI、Swagger、`developer.openapi.*`、codegen 边界 | 草稿预览不会写文件、不会执行远程脚本、敏感 schema 需脱敏 |
+| ModuleManifest | `src/modules/module-manifest.test.ts`、`src/pages/modules/modules-page.test.tsx` | `ModuleManifest`、`/api/modules`、`modules.*`、远程插件边界 | 只支持 compile-time/配置型入口，不加载远程 JS/CSS/React 组件 |
+| 工作流/动态表单 | `src/services/workflowService.test.ts`、`src/services/dynamicFormService.test.ts`、`src/pages/workflows/workflows-page.test.tsx` | `/api/workflows`、`/api/dynamic-forms`、`workflows.*`、`forms.*`、字段联动 | 字段白名单、`fieldErrors`、审批执行和历史真实性由 external API 负责 |
+| 数据维护/SaaS | `src/services/maintenanceService.test.ts`、`src/services/saasService.test.ts`、`src/pages/maintenance/maintenance-page.test.tsx` | `/api/maintenance`、`/api/saas`、`maintenance.*`、`saas.*`、审计留存 | 不提供 SQL 控制台、任意缓存 key 删除、支付账单或真实配额强制执行 |
+
+## v1.5 文档静态检查
+
+新增或调整 v1.5 模块时，至少执行：
+
+```bash
+rg -n "v1.5|scheduler|monitoring|OpenAPI|ModuleManifest|workflows|dynamic-forms|maintenance|saas" docs/tests docs/MANUAL_CHECKLIST.md docs/FINAL_HUMAN_CHECKLIST.md
+rg -n "/api/scheduler|/api/monitoring|/api/modules|/api/workflows|/api/dynamic-forms|/api/maintenance|/api/saas" docs
+rg -n "scheduler\\.|monitoring\\.|developer\\.openapi|modules\\.|workflows\\.|forms\\.|maintenance\\.|saas\\." docs src
+```
+
+人工验收项必须保持 `pending` 或待确认；未人工执行的 UI、真实 API、权限关闭和生产环境检查不得写成通过。
+
 ## 执行策略
 
 - 每个 PR 至少运行 lint、typecheck、test、build。

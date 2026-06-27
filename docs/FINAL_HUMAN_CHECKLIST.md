@@ -12,3 +12,6 @@ Status: pending human verification. Automated validation is recorded in `docs/pl
 - [ ] README、CONTRIBUTING、SECURITY、PR 模板和 Release 流程只要求 Node/npm 前端验证命令。
 - [ ] `LICENSE` 已使用 Apache License 2.0。
 - [ ] 发布前扫描仓库未暴露真实密钥、真实账号、Cookie、Token 或内部 URL。
+- [ ] v1.5 任务调度、监控告警、OpenAPI 辅助、ModuleManifest、工作流/动态表单、数据维护和 SaaS 扩展页面已完成浏览器人工验收。
+- [ ] v1.5 所有模块在 `VITE_ENABLE_DEMO_MOCKS=false` 时只调用 external API，不把 Demo Mock 写成生产实现。
+- [ ] v1.5 权限码 `scheduler.*`、`monitoring.*`、`developer.openapi.*`、`modules.*`、`workflows.*`、`forms.*`、`maintenance.*`、`saas.*` 的菜单和按钮可见性已人工抽查。

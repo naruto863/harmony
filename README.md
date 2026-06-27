@@ -159,3 +159,13 @@ v1.0 发布版本建议为 `v1.0.0`。发布流程见 [docs/release-process.md](
 ## License
 
 Apache License 2.0。详情见 [LICENSE](LICENSE)。
+
+## 支持与致谢 / Support
+
+这个项目主要利用业余时间维护，个人精力确实有限，文档和代码如有疏漏还请包涵。
+
+如果你觉得它还不错，或者刚好解决了你的问题，欢迎点个 Star、帮忙转发一下。感谢支持。
+
+This project is mainly maintained in spare time, so documentation and code may occasionally have omissions. Thanks for your understanding.
+
+If you find it useful, or if it happens to solve your problem, a Star or a share would be greatly appreciated. Thank you for your support.

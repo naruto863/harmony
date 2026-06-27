@@ -66,7 +66,7 @@ export interface Role {
 export interface Permission {
   id: string;
   resource: string;
-  action: 'create' | 'read' | 'update' | 'delete' | 'manage';
+  action: 'create' | 'read' | 'update' | 'delete' | 'manage' | 'execute' | 'retry' | 'start' | 'approve' | 'reject' | 'preview' | 'clear' | 'sync' | 'toggle';
   description: string;
 }
 

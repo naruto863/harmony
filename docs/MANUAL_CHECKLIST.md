@@ -43,3 +43,15 @@
 - 文件中心：确认上传弹窗展示 `/api/files/upload-policy` 返回的大小、类型、数量、配额和存储策略；下载通过 `/api/files/{fileId}/download-url`，预览通过 `/api/files/{fileId}/preview-url`。
 - CRUD 状态：确认 `DataTable` 在加载、无数据、搜索无结果、无权限、接口不可用、字段错误、批量部分失败和列配置变化时表现符合产品预期。
 - Demo 边界：确认 Demo Mock 只作为预览路径，没有把 SSO、邮件短信、对象存储、导入导出 Worker 或服务端权限写成仓库内置能力。
+
+## v1.5 待人工验收
+
+- 任务调度：进入 `/scheduler/jobs` 与 `/scheduler/executions`，确认任务定义、执行日志、失败重试和立即执行入口符合权限、二次确认和 external API 审计边界。
+- 监控告警：进入 `/monitoring/health` 与 `/monitoring/alerts`，确认健康状态、接口耗时、错误率、告警历史和 TraceId 展示来自 external API 或 Demo Mock，不包含敏感请求体或 token。
+- OpenAPI 辅助：进入 `/developer/openapi`，确认只能生成 route、permission、menu 和 service 草稿预览，不写入源码、不执行远程脚本，敏感 OpenAPI/Swagger 示例已脱敏。
+- ModuleManifest：进入 `/modules`，确认只展示 compile-time/配置型 manifest，不支持远程插件 marketplace、远程 JS/CSS 或远程 React 组件加载。
+- 工作流与动态表单：进入 `/workflows` 与 `/dynamic-forms`，确认字段类型白名单、字段联动限制和 `fieldErrors` 口径正确；审批执行、节点权限和历史真实性仍由 external API 负责。
+- 数据维护：进入 `/maintenance/cache`，确认只展示预注册维护资源，不存在 SQL 控制台、任意脚本或任意缓存 key 删除入口。
+- 危险操作：确认缓存清理和基础数据同步需要权限、二次确认、原因字段和 external API 审计兜底；Demo 模式不得执行真实写操作。
+- SaaS 扩展：进入 `/saas/plans`，确认套餐、配额、模块启停和审计留存只作为 external API 返回结果展示，真实强制执行不在前端完成。
+- 权限边界：确认 `maintenance.*`、`saas.*` 只控制前端可见性，关闭权限后菜单和按钮隐藏，接口级授权仍由外部 API 验证。

@@ -44,6 +44,54 @@ src/modules/<module>/
 - 列表页复用现有筛选、分页、表格、空状态和错误展示模式。
 - 新增环境变量时同步 `.env.example`、README 和相关文档。
 
+## 2.1 OpenAPI 草稿辅助
+
+v1.5 提供 `/developer/openapi` 作为可选草稿辅助入口。它可以根据用户粘贴的 OpenAPI/Swagger JSON 生成 route、权限码、菜单和 service 方法建议，但只用于预览和人工确认。
+
+使用边界：
+
+- 不自动写入 `src/` 或 `docs/`。
+- 不执行 schema 中的脚本或示例代码。
+- 不默认引入 OpenAPI codegen 依赖。
+- 生成结果仍必须按本模板补齐路由、菜单、权限、Demo 数据、API 契约和测试。
+- OpenAPI 示例中的真实内网地址、账号、手机号、邮箱、token 或密钥必须先脱敏。
+
+## 2.2 ModuleManifest 约束
+
+v1.5 提供 `/modules` 作为模块清单入口。新模块可用 `ModuleManifest` 描述路由、菜单、权限、字典、审计事件、功能开关、API 前缀和 Demo 边界。
+
+最低约束：
+
+- `routes[].path` 必须已经在前端 `ROUTE_COMPONENTS` 中声明。
+- `menuItems[].permission` 必须进入模块权限集合。
+- `apiPrefixes[]` 只描述 external API 前缀，页面仍通过 service 层和 `apiClient` 调用。
+- `remoteRuntime` 必须默认为 `false`。
+- 不支持运行时远程插件、远程 JS/CSS/React 组件或插件市场。
+- 模块关闭后不能影响 v1.0 核心页面和默认菜单。
+
+## 2.3 工作流与动态表单模板
+
+如业务模块需要审批流或动态表单，优先复用 v1.5 的 `/workflows` 与 `/dynamic-forms` 接入模板。
+
+边界：
+
+- 审批流执行、节点权限、会签、抄送、超时和历史真实性由 external API 或工作流平台负责。
+- 动态表单字段类型只允许 `text`、`textarea`、`number`、`select`、`date`、`switch`、`upload`、`user-picker`、`dept-picker`。
+- 字段联动只能使用受限配置，不执行任意 JavaScript。
+- 表单提交错误继续使用服务层 `fieldErrors`。
+- 新模块必须同步 `workflows.*`、`forms.*` 权限码、Demo 边界和人工验收清单。
+
+## 2.4 数据维护与 SaaS 扩展模板
+
+如业务模块需要缓存刷新、基础数据同步、地区/行业分类维护、套餐门槛、配额展示或模块启停，优先复用 v1.5 的 `/maintenance/cache` 与 `/saas/plans` 接入模板。
+
+边界：
+
+- 维护资源必须由 external API 预注册，前端只提交资源 ID、原因和二次确认文本。
+- 不提供 SQL 控制台、任意脚本、任意缓存 key 删除或绕过审计的维护入口。
+- 套餐、配额、模块启停和审计留存周期只在前端展示；真实强制执行由 external API 或 SaaS 平台负责。
+- 新模块必须同步 `maintenance.*`、`saas.*` 权限码、Demo 边界、API 契约和人工验收清单。
+
 ## 3. 权限、菜单与字典
 
 权限码建议：
