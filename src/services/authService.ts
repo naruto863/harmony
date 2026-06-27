@@ -61,6 +61,10 @@ const normalizeLoginOptions = (options?: string | LoginOptions): LoginOptions =>
   return options ?? {};
 };
 
+/**
+ * authService 是页面和 API 实现之间的适配层。
+ * 页面只调用这里的登录能力，不需要知道当前环境走 Demo Mock 还是真实后端接口。
+ */
 export const login = (email: string, password: string, options?: string | LoginOptions) => {
   const loginOptions = normalizeLoginOptions(options);
   if (isDemoApiEnabled()) {
@@ -73,6 +77,7 @@ export const login = (email: string, password: string, options?: string | LoginO
   });
 };
 
+// Demo 模式明确禁止注册，避免用户误以为本地 mock 会创建真实账号。
 export const register = (email: string, password: string, name: string) => {
   if (isDemoApiEnabled()) {
     return demoRegister();
@@ -80,6 +85,10 @@ export const register = (email: string, password: string, name: string) => {
   return apiClient.post<void>("/api/auth/register", { email, password, name });
 };
 
+/**
+ * refreshToken 保留与真实 API 一致的函数形状。
+ * 当前 apiClient 自己实现了 401 刷新流程，此函数主要供显式刷新场景或后续扩展复用。
+ */
 export const refreshToken = (refreshTokenValue: string) => {
   if (isDemoApiEnabled()) {
     return demoRefreshToken();
@@ -96,6 +105,7 @@ export const logout = (refreshTokenValue: string) => {
   return apiClient.post<void>("/api/auth/logout", { refreshToken: refreshTokenValue });
 };
 
+// 验证码、密码重置和 SSO 都属于外部身份能力，Demo 环境只给出安全的空结果或明确拒绝。
 export const getCaptchaChallenge = () => {
   if (isDemoApiEnabled()) {
     return Promise.resolve(null);

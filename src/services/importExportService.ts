@@ -38,6 +38,10 @@ type ImportExportTaskPayload = Omit<ImportExportTask, 'errors'> & {
 const IMPORT_EXPORT_TASK_API = '/api/import-export/tasks';
 const IMPORT_EXPORT_DEMO_TASK_KEY = demoStorageKey('import-export-tasks');
 
+/**
+ * service 层统一返回 ServiceResult，而不是把 ApiError 直接抛给页面。
+ * 页面组件因此可以只关心 success/data/error 三段结构，错误细节仍通过 traceId/fieldErrors 保留。
+ */
 const wrapSuccess = <T>(data: T): ServiceResult<T> => ({
   success: true,
   data,
@@ -54,6 +58,10 @@ const wrapError = (message: string, error?: unknown): ServiceResult<never> => ({
   },
 });
 
+/**
+ * 查询参数只包含用户显式选择的筛选条件。
+ * 这样外部 API 可以区分“未筛选”和“筛选为空字符串”，避免后端误判查询意图。
+ */
 const buildTaskQuery = (query: ImportExportTaskQuery = {}) => {
   const params = new URLSearchParams();
   if (query.taskType) params.set('taskType', query.taskType);
@@ -63,6 +71,10 @@ const buildTaskQuery = (query: ImportExportTaskQuery = {}) => {
   return queryString ? `?${queryString}` : '';
 };
 
+/**
+ * 后端为了兼容不同任务引擎，错误明细可能以 JSON 字符串存放在 errorDetails。
+ * 这里尽量解析为结构化行错误；如果不是数组或不是合法 JSON，就退化为一条普通错误消息。
+ */
 export const parseImportExportTaskErrors = (errorDetails?: string | null): ImportExportTaskError[] => {
   if (!errorDetails) return [];
   try {
@@ -84,6 +96,10 @@ export const parseImportExportTaskErrors = (errorDetails?: string | null): Impor
   }
 };
 
+/**
+ * 外部 API 和 Demo 种子数据都先归一化成前端稳定的 ImportExportTask。
+ * 默认计数和 errors 在这里补齐，页面就不用重复处理 null/undefined 分支。
+ */
 const normalizeTask = (task: ImportExportTaskPayload): ImportExportTask => ({
   ...task,
   totalCount: task.totalCount ?? 0,
@@ -93,6 +109,10 @@ const normalizeTask = (task: ImportExportTaskPayload): ImportExportTask => ({
   errors: parseImportExportTaskErrors(task.errorDetails),
 });
 
+/**
+ * Demo 任务模拟异步任务生命周期的最小状态：
+ * 导出任务直接完成并给出 data URL，导入任务进入 pending，供页面验证列表/重试/取消交互。
+ */
 const createDemoTask = (taskType: ImportExportTaskType, entityType: ExportEntityType): ImportExportTask => {
   const now = new Date().toISOString();
   const task: ImportExportTask = {
@@ -116,6 +136,10 @@ const createDemoTask = (taskType: ImportExportTaskType, entityType: ExportEntity
   return task;
 };
 
+/**
+ * 初始 Demo 任务覆盖成功导出和失败导入两种常见状态，
+ * 便于无后端环境下直接看到错误报告、计数和状态标签的展示效果。
+ */
 const getSeedDemoTasks = (): ImportExportTask[] => {
   const now = new Date().toISOString();
   return [
@@ -159,6 +183,10 @@ const getSeedDemoTasks = (): ImportExportTask[] => {
   ];
 };
 
+/**
+ * 读取 Demo 任务时会把旧版本只包含 errorDetails 的记录升级为带 errors 的结构。
+ * localStorage 损坏时返回种子数据，保证演示功能可恢复。
+ */
 const readDemoTasks = (): ImportExportTask[] => {
   if (typeof localStorage === 'undefined') return getSeedDemoTasks();
   const raw = localStorage.getItem(IMPORT_EXPORT_DEMO_TASK_KEY);
@@ -189,6 +217,11 @@ const filterTasks = (tasks: ImportExportTask[], query: ImportExportTaskQuery) =>
   })
 );
 
+/**
+ * 获取任务列表：
+ * - Demo 模式读写本地任务队列，支持筛选和状态变更演示。
+ * - 非 Demo 模式调用统一任务接口，并把外部返回归一化为前端结构。
+ */
 export const getImportExportTasks = async (
   query: ImportExportTaskQuery = {}
 ): Promise<ServiceResult<ImportExportTask[]>> => {
@@ -263,6 +296,7 @@ export const createImportTaskFromFile = async (
   try {
     const query = new URLSearchParams();
     if (tenantId) query.set('tenantId', tenantId);
+    // 正式链路先上传文件拿 fileId，再创建导入任务；任务引擎不直接接收浏览器 File 对象。
     const uploaded = await apiClient.upload<{ id: string }>(
       `/api/files/upload${query.toString() ? `?${query.toString()}` : ''}`,
       file
@@ -280,6 +314,7 @@ export const retryImportExportTask = async (taskId: string): Promise<ServiceResu
     if (!task) return wrapError('任务不存在');
     const updated: ImportExportTask = {
       ...task,
+      // Demo 中重试只把任务重置为排队态，不模拟后台真正执行。
       status: 'pending',
       phase: 'queued',
       updatedAt: new Date().toISOString(),
@@ -324,6 +359,7 @@ export const downloadImportExportErrorReport = async (taskId: string): Promise<S
     const tasks = readDemoTasks();
     const task = tasks.find((item) => item.id === taskId);
     if (!task) return wrapError('任务不存在');
+    // Demo 错误报告用 data URL 直接下载，真实环境则只消费后端返回的 downloadUrl。
     const rows = ['row,field,message', ...(task.errors ?? []).map((error) => (
       `${error.row ?? ''},${error.field ?? ''},${error.message}`
     ))];
@@ -338,7 +374,10 @@ export const downloadImportExportErrorReport = async (taskId: string): Promise<S
   }
 };
 
-// CSV 解析
+/**
+ * 轻量 CSV 解析器，仅覆盖当前导入模板需要的逗号分隔和双引号包裹字段。
+ * 如果后续支持 Excel、多行字段或更复杂 CSV 方言，应替换为专门解析库，而不是继续扩展这里。
+ */
 const parseCSV = (content: string): string[][] => {
   const lines = content.split('\n').filter(line => line.trim());
   return lines.map(line => {
@@ -362,7 +401,10 @@ const parseCSV = (content: string): string[][] => {
   });
 };
 
-// CSV 生成
+/**
+ * CSV 生成统一处理逗号、双引号和换行转义。
+ * downloadFile 会额外写入 UTF-8 BOM，保证中文表头在常见表格软件中正常打开。
+ */
 const generateCSV = (headers: string[], rows: string[][]): string => {
   const escapeCsv = (value: string) => {
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -377,7 +419,10 @@ const generateCSV = (headers: string[], rows: string[][]): string => {
   return [headerLine, ...dataLines].join('\n');
 };
 
-// 下载文件
+/**
+ * 浏览器端下载使用临时 object URL。
+ * 点击后立即 revoke，避免长时间保留 Blob 引用造成内存占用。
+ */
 const downloadFile = (content: string | ArrayBuffer, filename: string, mimeType: string) => {
   const blob = typeof content === 'string' 
     ? new Blob(['\ufeff' + content], { type: mimeType })
@@ -392,7 +437,7 @@ const downloadFile = (content: string | ArrayBuffer, filename: string, mimeType:
   URL.revokeObjectURL(url);
 };
 
-// 解析文件
+// 当前导入模板都是文本 CSV，File.text() 足够；二进制格式接入时需要新增独立解析流程。
 const parseFile = async (file: File): Promise<string[][]> => {
   const content = await file.text();
   return parseCSV(content);
@@ -531,6 +576,7 @@ export const importUsers = async (
   file: File,
   tenantId: string
 ): Promise<ImportResult> => {
+  // 旧版本地导入只允许 Demo 模式使用，正式导入应走 createImportTaskFromFile 的任务链路。
   requireDemoMode('importExportService.importUsers');
   await delay(1000);
   
@@ -554,7 +600,7 @@ export const importUsers = async (
     
     const [name, email, phone, roleName, status] = row;
     
-    // 验证必填字段
+    // 逐行校验并累积错误，不因为单行失败中断整个导入预览。
     if (!name || !email) {
       result.failed++;
       result.errors.push({ row: i + 1, message: '姓名和邮箱为必填项' });
@@ -601,6 +647,7 @@ export const importProjects = async (
   file: File,
   tenantId: string
 ): Promise<ImportResult> => {
+  // 与 importUsers 一样，这是 Demo-only 的本地导入预览，不代表正式后端任务链路。
   requireDemoMode('importExportService.importProjects');
   await delay(1000);
   
@@ -623,6 +670,7 @@ export const importProjects = async (
     
     const [name, description, status, startDate, endDate, tags] = row;
     
+    // 项目导入最小必填只有名称，其余字段按演示默认值补齐，便于验证错误汇总体验。
     if (!name) {
       result.failed++;
       result.errors.push({ row: i + 1, message: '项目名称为必填项' });
@@ -658,6 +706,7 @@ export const importRoles = async (
   file: File,
   tenantId: string
 ): Promise<ImportResult> => {
+  // 角色导入会写入 Demo localStorage，生产环境必须通过任务 API 做权限和审计控制。
   requireDemoMode('importExportService.importRoles');
   await delay(1000);
   
@@ -686,7 +735,7 @@ export const importRoles = async (
       continue;
     }
     
-    // 检查角色名是否已存在
+    // 演示态仍保持角色名唯一，避免导入后页面出现无法区分的重复角色。
     if (roles.some((r: Role) => r.name === name)) {
       result.failed++;
       result.errors.push({ row: i + 1, message: '角色名称已存在' });
@@ -718,6 +767,7 @@ export const importRoles = async (
 export const validateImportFile = (file: File): { valid: boolean; error?: string } => {
   const maxSize = 10 * 1024 * 1024; // 10MB
   
+  // 当前前端模板和轻量解析器只支持 CSV；其他格式需要先接入对应解析/任务链路。
   if (!file.name.endsWith('.csv')) {
     return { valid: false, error: '请上传 CSV 文件' };
   }

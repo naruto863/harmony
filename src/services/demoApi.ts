@@ -27,6 +27,10 @@ const DEMO_POSITIONS_KEY = "ha_demo:positions";
 const DEMO_USER_GROUPS_KEY = "ha_demo:user_groups";
 const DEMO_USER_GROUP_MEMBERS_KEY = "ha_demo:user_group_members";
 
+/**
+ * localStorage 在测试、SSR-like 环境或浏览器隐私模式下都可能不可用。
+ * Demo API 统一通过这个入口访问，调用方拿到 null 时回退到内存种子数据。
+ */
 const getStorage = (): Storage | null => {
   try {
     return window.localStorage;
@@ -37,6 +41,11 @@ const getStorage = (): Storage | null => {
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
+/**
+ * 读取可变演示数据。
+ * 首次读取时把 mock-data 的种子写入 localStorage，让后续 CRUD 能表现得像真实后端状态。
+ * JSON 损坏时用种子数据自愈，避免演示页面因为手工改坏存储而白屏。
+ */
 const readDemoJson = <T>(key: string, fallback: T): T => {
   const storage = getStorage();
   if (!storage) return clone(fallback);
@@ -60,6 +69,10 @@ const writeDemoJson = <T>(key: string, value: T): void => {
   storage?.setItem(key, JSON.stringify(value));
 };
 
+/**
+ * Demo token 只用于驱动前端鉴权流程，不具备真实安全含义。
+ * token 中包含 userId、tenantId 和签发时间，便于调试当前演示会话归属。
+ */
 const buildDemoTokens = (userId: string, tenantId?: string) => {
   const issuedAt = Date.now();
   const tenantPart = tenantId ?? "none";
@@ -78,6 +91,10 @@ const toTenantDto = (tenant: (typeof TENANTS)[number]): TenantDto => ({
   updatedAt: tenant.updatedAt,
 });
 
+/**
+ * 同步写入 ha_demo:* 和历史 tenant key。
+ * 这样新 Demo API 与既有 TenantContext/localStorage 恢复逻辑可以同时工作。
+ */
 const setDemoSession = (userId: string, tenantId?: string) => {
   const storage = getStorage();
   storage?.setItem(DEMO_USER_ID_KEY, userId);
@@ -87,6 +104,10 @@ const setDemoSession = (userId: string, tenantId?: string) => {
   }
 };
 
+/**
+ * 优先读取 Demo 专用 userId；没有时兼容 AuthContext 持久化的 admin_studio_user。
+ * 兼容逻辑保证从老登录态刷新页面时，Demo 服务仍能恢复当前用户。
+ */
 const getStoredUserId = (): string | null => {
   const storage = getStorage();
   if (!storage) return null;
@@ -107,6 +128,10 @@ const getStoredTenantId = (): string | null => {
   return storage.getItem(DEMO_TENANT_ID_KEY) ?? storage.getItem(TENANT_KEY);
 };
 
+/**
+ * Demo API 的认证边界。
+ * 任何需要用户身份的演示接口都先通过这里确认当前会话仍能映射到 mock 用户。
+ */
 const getCurrentUser = (): User => {
   const userId = getStoredUserId();
   const user = USERS.find((item) => item.id === userId);
@@ -121,6 +146,10 @@ const getTenantsForUser = (userId: string): TenantDto[] => {
   return TENANTS.filter((tenant) => tenantIds.has(tenant.id)).map(toTenantDto);
 };
 
+/**
+ * Demo 租户解析同时承担授权校验：
+ * 请求的 tenantId 必须在该用户的租户关系表中，否则抛出无权访问错误。
+ */
 const getCurrentTenant = (userId: string, requestedTenantId?: string): TenantDto => {
   const tenants = getTenantsForUser(userId);
   const tenantId = requestedTenantId ?? getStoredTenantId() ?? tenants[0]?.id;
@@ -159,6 +188,10 @@ const readUserGroupMembers = (): Record<string, string[]> =>
 const writeUserGroupMembers = (members: Record<string, string[]>): void =>
   writeDemoJson(DEMO_USER_GROUP_MEMBERS_KEY, members);
 
+/**
+ * mock-data 中的 DemoUserGroup 保留 tenantId 用于过滤；
+ * 对页面暴露时移除内部 tenantId，并根据成员关系动态计算 memberCount。
+ */
 const withMemberCount = (group: DemoUserGroup, members = readUserGroupMembers()): UserGroup => {
   const { tenantId: _tenantId, ...publicGroup } = group;
   return {
@@ -169,6 +202,11 @@ const withMemberCount = (group: DemoUserGroup, members = readUserGroupMembers())
 
 export const isDemoApiEnabled = (): boolean => isDemoModeEnabled();
 
+/**
+ * 演示登录尽量模拟真实登录的关键约束：
+ * 校验账号密码、账号状态、可访问租户，并返回 token + user + tenants。
+ * 页面和 Context 不需要知道当前走的是 Demo API 还是真实 API。
+ */
 export const demoLogin = async (email: string, password: string, tenantId?: string): Promise<LoginResponse> => {
   const user = USERS.find((item) => item.email.toLowerCase() === email.toLowerCase());
   if (!user || USER_PASSWORDS[user.email] !== password) {
@@ -254,6 +292,7 @@ export const demoGetUsers = async (params: {
   status?: string;
   roleId?: string;
 }): Promise<Array<User & { roleId?: string; roleName?: string; joinedAt?: string; deptId?: string; deptName?: string }>> => {
+  // 用户列表来自用户-租户-角色关系表，而不是直接返回全量 USERS，确保租户隔离语义与真实接口一致。
   const relations = USER_TENANT_ROLES.filter((relation) => relation.tenantId === params.tenantId);
   const users = relations.flatMap((relation) => {
     const user = USERS.find((item) => item.id === relation.userId);
@@ -418,6 +457,7 @@ export const demoUpdateUserGroupMembers = async (groupId: string, userIds: strin
     throw new Error("演示用户组不存在");
   }
   const allowedUserIds = new Set(USERS.map((user) => user.id));
+  // 写入成员前做白名单和去重，避免 UI 传入不存在用户或重复 id 后污染演示状态。
   const nextUserIds = userIds.filter((userId, index) => allowedUserIds.has(userId) && userIds.indexOf(userId) === index);
   writeUserGroupMembers({
     ...readUserGroupMembers(),

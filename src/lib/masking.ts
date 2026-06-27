@@ -1,6 +1,9 @@
 /**
  * 数据脱敏工具函数
  * 支持多种敏感信息类型的脱敏处理
+ *
+ * 注意：前端脱敏只用于展示层降低误暴露风险，不是安全边界。
+ * 后端仍应按权限裁剪敏感字段，不能把完整敏感数据下发后只依赖这里隐藏。
  */
 
 export type MaskingType = 'phone' | 'email' | 'idCard' | 'bankCard' | 'name' | 'address' | 'custom';

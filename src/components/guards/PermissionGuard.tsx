@@ -23,6 +23,12 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = ({
 
   let hasAccess = true;
 
+  /**
+   * 单权限和多权限二选一：
+   * - permission 适合菜单路由这类“一页一个权限码”的场景。
+   * - permissions + requireAll 适合按钮组或复合操作，需要任一/全部权限时使用。
+   * 默认 hasAccess=true 是为了让未声明权限的纯展示组件保持可渲染。
+   */
   if (permission) {
     hasAccess = hasPermission(permission);
   } else if (permissions.length > 0) {

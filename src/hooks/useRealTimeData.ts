@@ -15,12 +15,16 @@ export interface RealTimeDataConfig {
   enabled?: boolean;
 }
 
-// 模拟实时数据生成
+/**
+ * 生成演示指标的随机波动值。
+ * 这里不代表真实监控采集逻辑，只用于无后端时让大屏和监控组件呈现动态效果。
+ */
 const generateMetricValue = (baseValue: number, variance: number): number => {
   const change = (Math.random() - 0.5) * variance;
   return Math.max(0, baseValue + change);
 };
 
+// 小于 0.5 的变化视为稳定，避免随机数造成趋势图标频繁抖动。
 const getTrend = (current: number, previous: number): 'up' | 'down' | 'stable' => {
   const diff = current - previous;
   if (Math.abs(diff) < 0.5) return 'stable';
@@ -57,6 +61,10 @@ export const useRealTimeData = (config: RealTimeDataConfig = {}) => {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  /**
+   * 使用函数式 setState 基于上一帧指标生成下一帧。
+   * 这样即使定时器回调闭包不更新，也能拿到最新 metrics，避免趋势计算使用旧值。
+   */
   const updateMetrics = useCallback(() => {
     setMetrics(prevMetrics => 
       prevMetrics.map(metric => {
@@ -80,6 +88,10 @@ export const useRealTimeData = (config: RealTimeDataConfig = {}) => {
     setLastUpdate(new Date());
   }, []);
 
+  /**
+   * connect 会先清理旧 interval，再创建新 interval。
+   * 当 updateInterval 变化时可以安全重连，不会留下多个定时器同时写状态。
+   */
   const connect = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -89,6 +101,7 @@ export const useRealTimeData = (config: RealTimeDataConfig = {}) => {
     intervalRef.current = setInterval(updateMetrics, updateInterval);
   }, [updateInterval, updateMetrics]);
 
+  // disconnect 同时负责手动断开和组件卸载清理，保证定时器生命周期集中在一个函数里。
   const disconnect = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -123,7 +136,7 @@ export const useRealTimeData = (config: RealTimeDataConfig = {}) => {
   };
 };
 
-// 实时图表数据 Hook
+// 实时图表数据 Hook：把单个指标的当前值转换成固定长度的时间序列。
 export interface ChartDataPoint {
   time: string;
   value: number;
@@ -137,6 +150,10 @@ export const useRealTimeChartData = (
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const { getMetricById, isConnected } = useRealTimeData({ updateInterval });
 
+  /**
+   * 图表层维护自己的滑动窗口，而不是复用 metrics 数组。
+   * maxPoints 控制最多保留多少个点，避免长时间打开页面后数组无限增长。
+   */
   useEffect(() => {
     const interval = setInterval(() => {
       const metric = getMetricById(metricId);

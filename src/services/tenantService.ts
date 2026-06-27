@@ -31,6 +31,10 @@ export type UpdateTenantMemberData = {
   status?: TenantMember["status"];
 };
 
+/**
+ * 租户 service 同样承担 Demo/真实 API 的适配。
+ * Context 和页面只消费统一 DTO，避免在 UI 层散落环境判断。
+ */
 export const getMyTenants = () => {
   if (isDemoApiEnabled()) {
     return demoGetMyTenants();
@@ -38,6 +42,10 @@ export const getMyTenants = () => {
   return apiClient.get<TenantDto[]>("/api/tenants/mine");
 };
 
+/**
+ * 切换租户通常会改变 token 中的租户声明和权限范围。
+ * 因此真实接口需要返回新 token；Demo API 也会模拟同样结构，保证上层流程一致。
+ */
 export const switchTenant = (tenantId: string) => {
   if (isDemoApiEnabled()) {
     return demoSwitchTenant(tenantId);
@@ -54,6 +62,7 @@ export const getTenants = () => {
 
 export const getTenantMembers = async (tenantId: string): Promise<TenantMember[]> => {
   if (isDemoApiEnabled()) {
+    // Demo 成员列表由“用户列表 + 用户租户角色关系”合成，模拟后端聚合后的成员视图。
     const users = await demoGetUsers({ tenantId });
     return users.map((user) => ({
       userId: user.id,

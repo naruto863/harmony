@@ -14,6 +14,7 @@ type OpenApiDocument = {
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
 
+// HTTP 方法到权限动作的保守映射，只生成常见 CRUD 建议，复杂权限仍需人工确认。
 const actionByMethod: Record<(typeof HTTP_METHODS)[number], string> = {
   get: "read",
   post: "create",
@@ -22,6 +23,7 @@ const actionByMethod: Record<(typeof HTTP_METHODS)[number], string> = {
   delete: "delete",
 };
 
+// 方法名用于草稿预览，不直接写文件；命名偏向前端 service 函数的可读性。
 const verbByMethod: Record<(typeof HTTP_METHODS)[number], string> = {
   get: "list",
   post: "create",
@@ -30,6 +32,10 @@ const verbByMethod: Record<(typeof HTTP_METHODS)[number], string> = {
   delete: "delete",
 };
 
+/**
+ * 解析 OpenAPI 文本时只校验草稿生成依赖的最小字段。
+ * 这里不做完整 OpenAPI Schema validation，是为了让用户能先用不完整草稿预览模块形态。
+ */
 const parseOpenApiDocument = (schemaText: string): OpenApiDocument => {
   try {
     const value = JSON.parse(schemaText);
@@ -52,6 +58,10 @@ const parseOpenApiDocument = (schemaText: string): OpenApiDocument => {
   }
 };
 
+/**
+ * 路由前缀统一成前导斜杠形式。
+ * 空前缀保留为根路径，方便用户明确看到输入为空时的草稿结果。
+ */
 const normalizeRoutePrefix = (routePrefix: string) => {
   const trimmed = routePrefix.trim();
   if (!trimmed) return "/";
@@ -64,6 +74,7 @@ const toPascalCase = (value: string) => value
   .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
   .join("");
 
+// 简单英文复数还原只服务于方法名可读性，不作为业务实体命名的最终权威。
 const singularize = (value: string) => {
   if (value.endsWith("ies")) return `${value.slice(0, -3)}y`;
   if (value.endsWith("s")) return value.slice(0, -1);
@@ -80,6 +91,7 @@ const collectServiceMethods = (
   moduleKey: string
 ): OpenApiServiceMethodDraft[] => {
   const drafts: OpenApiServiceMethodDraft[] = [];
+  // 遍历 paths 下的标准 HTTP 方法，忽略 parameters、summary 等非 operation 字段。
   Object.entries(paths).forEach(([path, operations]) => {
     HTTP_METHODS.forEach((method) => {
       const operation = operations[method];
@@ -100,6 +112,7 @@ const collectPermissions = (
   permissionPrefix: string
 ) => {
   const seen = new Set<string>();
+  // 只根据实际出现的方法生成权限建议，避免为只读接口凭空生成写权限。
   methods.forEach((method) => {
     const action = actionByMethod[method.httpMethod.toLowerCase() as keyof typeof actionByMethod];
     if (action) seen.add(`${permissionPrefix}.${action}`);
@@ -111,6 +124,7 @@ const collectPermissions = (
 
 const collectWarnings = (document: OpenApiDocument) => {
   const warnings: string[] = [];
+  // servers.url 可能包含真实内网域名或环境地址，公开 Demo/文档前需要人工脱敏。
   if (document.servers?.some((server) => Boolean(server.url))) {
     warnings.push("检测到 servers.url，请在公开文档或 Demo 中使用脱敏占位值。");
   }
@@ -118,6 +132,10 @@ const collectWarnings = (document: OpenApiDocument) => {
   return warnings;
 };
 
+/**
+ * 根据用户粘贴的 OpenAPI JSON 生成“模块接入草稿”。
+ * 该函数只做预览建议：不会写文件、不会拉远程资源，也不会执行任何生成脚本。
+ */
 export const buildOpenApiModuleDraft = (input: OpenApiDraftInput): OpenApiModuleDraft => {
   const document = parseOpenApiDocument(input.schemaText);
   const route = normalizeRoutePrefix(input.routePrefix);

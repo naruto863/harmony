@@ -25,6 +25,13 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [role, setRole] = useState<Role | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
 
+  /**
+   * 权限刷新以“认证态 + 当前租户”为前置条件。
+   * 没有租户时立即清空权限，避免上一个租户的角色/权限短暂泄露到当前页面。
+   *
+   * role 和 permissions 分开加载，是为了兼容后端把“角色信息”和“前端权限码”
+   * 暴露为两个接口的实现；其中权限接口失败时降级为空权限，而不是沿用旧数据。
+   */
   const refreshPermissions = useCallback(async () => {
     if (!isAuthenticated || !currentTenant) {
       setRole(null);
@@ -43,10 +50,15 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [isAuthenticated, currentTenant]);
 
+  // 初次进入、登录态变化或租户切换后，都重新计算当前权限边界。
   useEffect(() => {
     void refreshPermissions();
   }, [refreshPermissions]);
 
+  /**
+   * API 层收到 403 会广播 accessDenied。
+   * 这里监听该事件并刷新权限，处理管理员在后台调整权限后前端缓存仍停留在旧状态的情况。
+   */
   useEffect(() => {
     if (!isAuthenticated || !currentTenant) {
       return;
@@ -58,7 +70,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const hasPermission = (permission: string): boolean => {
     if (!role) return false;
-    // SuperAdmin 拥有所有权限
+    // SuperAdmin 是前端权限判断的最高优先级，不依赖 permissions 列表是否完整下发。
     if (role.type === 'super_admin') return true;
     return permissions.includes(permission);
   };

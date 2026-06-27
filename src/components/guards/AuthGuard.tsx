@@ -14,7 +14,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, requireTenant = 
   const { currentTenant, userTenants, isLoading: tenantLoading } = useTenant();
   const location = useLocation();
 
-  // 显示加载状态
+  // 等待认证和租户状态都恢复后再判断跳转，避免刷新页面时误判为未登录或未选租户。
   if (authLoading || tenantLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -26,17 +26,17 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, requireTenant = 
     );
   }
 
-  // 未登录，重定向到登录页
+  // 未登录时保留来源位置，登录成功后页面可以按需回跳。
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 需要选择租户但用户有多个租户且未选择
+  // 多租户账号必须显式选择工作空间，避免默认进入错误租户造成权限和数据口径混乱。
   if (requireTenant && !currentTenant && userTenants.length > 1) {
     return <Navigate to="/select-tenant" state={{ from: location }} replace />;
   }
 
-  // 需要租户但用户没有任何租户
+  // 后端返回空租户列表时不再继续渲染受保护页面，直接给出可操作的业务提示。
   if (requireTenant && userTenants.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -48,6 +48,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, requireTenant = 
     );
   }
 
+  // 待完善资料的用户只能先进入个人设置页，防止未完成账号继续访问核心业务入口。
   if (requireTenant && user?.status === 'pending' && location.pathname !== '/settings/profile') {
     return <Navigate to="/settings/profile" replace />;
   }

@@ -35,6 +35,10 @@ export interface ModuleManifestValidationResult {
   issues: string[];
 }
 
+/**
+ * 模块清单允许声明的前端路由白名单。
+ * 这里只列已经在懒加载路由表中有真实页面组件的路径，防止 manifest 先于页面实现暴露入口。
+ */
 export const DECLARED_MODULE_ROUTES = new Set([
   "/scheduler/jobs",
   "/scheduler/executions",
@@ -44,6 +48,11 @@ export const DECLARED_MODULE_ROUTES = new Set([
   "/modules",
 ]);
 
+/**
+ * 核心模块清单是 v1.5 扩展能力的契约索引。
+ * 它不负责运行时加载插件，而是把模块的路由、菜单、权限、审计事件和 Demo 边界集中声明，
+ * 供模块清单页、文档和后续接入真实 API 时做一致性校验。
+ */
 export const CORE_MODULE_MANIFESTS: ModuleManifest[] = [
   {
     key: "scheduler",
@@ -122,22 +131,26 @@ export const validateModuleManifest = (
 ): ModuleManifestValidationResult => {
   const issues: string[] = [];
 
+  // 当前仓库保持纯前端静态构建，不允许通过 manifest 引入远程 JS 或运行时插件入口。
   if (manifest.remoteRuntime || manifest.remoteEntry) {
     issues.push("不支持运行时远程插件或远程 JS 加载");
   }
 
+  // manifest 中的路由必须先在前端白名单中声明，菜单才能安全指向该页面。
   manifest.routes.forEach((route) => {
     if (!options.declaredRoutes.has(route.path)) {
       issues.push(`route ${route.path} 未在 ROUTE_COMPONENTS 白名单中声明`);
     }
   });
 
+  // 菜单引用的权限必须是模块自己声明过的权限，避免出现菜单可见但权限码无法治理的情况。
   manifest.menuItems.forEach((menuItem) => {
     if (!manifest.permissions.includes(menuItem.permission)) {
       issues.push(`menu ${menuItem.id} 使用的权限 ${menuItem.permission} 未在 manifest.permissions 中声明`);
     }
   });
 
+  // API 前缀统一收敛在 /api/ 下，便于网关、Mock 和文档按同一命名空间治理。
   manifest.apiPrefixes.forEach((prefix) => {
     if (!prefix.startsWith("/api/")) {
       issues.push(`apiPrefix ${prefix} 必须以 /api/ 开头`);

@@ -91,6 +91,10 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/saas/plans": LazyMaintenancePage,
 };
 
+/**
+ * 后端菜单只决定“哪些入口可见”，前端仍用 ROUTE_COMPONENTS 作为可渲染路由白名单。
+ * 这样即使菜单接口返回了未知 path，也不会动态加载未声明组件或形成任意路由注入。
+ */
 const buildMenuRoutes = (items: MenuItem[]) => {
   const routes: ReactNode[] = [];
   const visited = new Set<string>();
@@ -101,6 +105,7 @@ const buildMenuRoutes = (items: MenuItem[]) => {
     if (menu.path && menu.path !== "/" && menu.type !== "external" && menu.type !== "button") {
       const Component = ROUTE_COMPONENTS[menu.path];
       if (Component && !visited.has(menu.path)) {
+        // 每个菜单路由在渲染页面前再过一次 PermissionGuard，防止“菜单可见”和“页面可访问”口径漂移。
         const element = (
           <PermissionGuard permission={menu.permission} redirectTo="/403">
             <Component />
@@ -115,6 +120,7 @@ const buildMenuRoutes = (items: MenuItem[]) => {
     menu.children?.forEach(walk);
   };
 
+  // 菜单树可能是多级目录，路由需要扁平化后直接挂到 React Router 的嵌套路由下。
   items.forEach(walk);
   return routes;
 };
@@ -166,9 +172,12 @@ const buildUnavailableMenuRoutes = (element: ReactNode) => [
 ];
 
 /**
- * AppRoutes: 使用 useMenu 直接构建动态路由，
- * 确保所有 Route 元素都是 <Routes> / <Route> 的直接子元素，
- * 满足 React Router v6 的要求。
+ * AppRoutes 使用 useMenu 直接构建动态路由。
+ *
+ * React Router v6 要求 <Routes> 的直接子节点必须是 <Route>，
+ * 因此这里返回 Route 数组，而不是把动态路由封装成普通组件再渲染。
+ * 菜单处于 loading/error/empty 时也挂载 index 和 wildcard 两条兜底路由，
+ * 避免用户刷新深层地址后看到 NotFound，而是看到真实的菜单状态。
  */
 const AppRoutes = () => {
   const { menuItems, isLoading, loadStatus, errorMessage, refreshMenu } = useMenu();
@@ -185,6 +194,7 @@ const AppRoutes = () => {
     if (loadStatus === "empty") {
       return buildUnavailableMenuRoutes(<MenuRouteFallback state="empty" />);
     }
+    // Dashboard 是认证后的默认首页；其他页面由菜单服务决定是否挂载。
     return [
       <Route key="__dashboard__" index element={<LazyDashboard />} />,
       ...buildMenuRoutes(menuItems),
@@ -231,6 +241,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          {/* Provider 顺序体现状态依赖：认证 -> 租户 -> 权限 -> 菜单 -> 路由。 */}
           <AuthProvider>
             <AuthEventBridge />
             <TenantProvider>

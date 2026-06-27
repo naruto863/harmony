@@ -26,6 +26,10 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loadStatus, setLoadStatus] = useState<MenuLoadStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  /**
+   * 菜单是“当前租户 + 当前权限”的组合结果，所以没有租户时不能继续复用旧菜单。
+   * 加载成功后再按 Demo 边界过滤一次，确保生产关闭 Demo Mock 时不会暴露演示专用入口。
+   */
   const loadMenu = useCallback(async () => {
     if (!currentTenant) {
       setMenuItems([]);
@@ -57,6 +61,10 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [currentTenant]);
 
+  /**
+   * 认证态或租户切换会重置菜单加载状态。
+   * 这里不把菜单缓存成全局常量，是为了支持不同租户拥有不同菜单树和权限码。
+   */
   useEffect(() => {
     if (!isAuthenticated || !currentTenant) {
       setMenuItems([]);
@@ -68,6 +76,10 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadMenu();
   }, [isAuthenticated, currentTenant, loadMenu]);
 
+  /**
+   * 403 往往意味着权限或菜单配置已发生变化。
+   * 收到 accessDenied 后重新拉菜单，配合 PermissionContext 刷新权限，尽快让 UI 与后端授权一致。
+   */
   useEffect(() => {
     if (!isAuthenticated || !currentTenant) {
       return;
