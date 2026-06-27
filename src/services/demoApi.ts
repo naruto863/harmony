@@ -19,6 +19,11 @@ import type { LoginResponse } from "./authService";
 import type { SwitchTenantResponse, TenantDto } from "./tenantService";
 import type { DeptNode, MenuItem, Permission, PermissionGroup, Position, Role, User, UserGroup } from "@/types";
 
+/**
+ * Demo API 是无后端预览层，不是生产数据访问层。
+ * 它尽量模拟真实 API 的认证、租户隔离和 CRUD 形态，让页面/Context 不需要写 mock 分支；
+ * 但所有持久化都限制在 ha_demo:* localStorage 命名空间或 mock-data 种子数据中。
+ */
 const DEMO_USER_ID_KEY = "ha_demo:auth_user_id";
 const DEMO_TENANT_ID_KEY = "ha_demo:tenant_id";
 const TENANT_KEY = "admin_studio_tenant";
@@ -178,6 +183,7 @@ const readPositions = (): DemoPosition[] => readDemoJson(DEMO_POSITIONS_KEY, POS
 
 const writePositions = (positions: DemoPosition[]): void => writeDemoJson(DEMO_POSITIONS_KEY, positions);
 
+// 岗位和用户组是 Demo 中可变的管理对象，因此从 localStorage 读写，而不是每次返回静态种子。
 const readUserGroups = (): DemoUserGroup[] => readDemoJson(DEMO_USER_GROUPS_KEY, USER_GROUPS);
 
 const writeUserGroups = (groups: DemoUserGroup[]): void => writeDemoJson(DEMO_USER_GROUPS_KEY, groups);
@@ -332,6 +338,7 @@ export const demoCreatePosition = async (data: {
   tenantId?: string;
 }): Promise<Position> => {
   const positions = readPositions();
+  // tenantId 优先使用调用方传入值，缺省时回退当前 Demo 会话，保证新增岗位不会串到其他租户。
   const newPosition: DemoPosition = {
     id: `position_${Date.now()}`,
     tenantId: data.tenantId ?? getStoredTenantId() ?? "tenant_demo",
@@ -364,6 +371,7 @@ export const demoUpdatePosition = async (
   if (index === -1) {
     throw new Error("演示岗位不存在");
   }
+  // deptId 没有出现在更新负载里时保持原部门；显式传 null 才表示清空部门关联。
   const nextPosition: DemoPosition = {
     ...positions[index],
     ...data,
@@ -401,6 +409,7 @@ export const demoCreateUserGroup = async (data: {
   tenantId?: string;
 }): Promise<UserGroup> => {
   const groups = readUserGroups();
+  // 新建用户组时同步初始化成员表，后续成员维护无需再判断 members[groupId] 是否存在。
   const newGroup: DemoUserGroup = {
     id: `group_${Date.now()}`,
     tenantId: data.tenantId ?? getStoredTenantId() ?? "tenant_demo",

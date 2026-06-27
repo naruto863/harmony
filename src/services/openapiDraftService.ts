@@ -14,7 +14,11 @@ type OpenApiDocument = {
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
 
-// HTTP 方法到权限动作的保守映射，只生成常见 CRUD 建议，复杂权限仍需人工确认。
+/**
+ * HTTP 方法到权限动作的保守映射，只生成常见 CRUD 建议。
+ * 例如 POST 可能是 create、execute、approve 等业务语义，这里无法自动判断，
+ * 所以输出只能作为接入草稿，不能直接当成最终权限模型。
+ */
 const actionByMethod: Record<(typeof HTTP_METHODS)[number], string> = {
   get: "read",
   post: "create",
@@ -23,7 +27,10 @@ const actionByMethod: Record<(typeof HTTP_METHODS)[number], string> = {
   delete: "delete",
 };
 
-// 方法名用于草稿预览，不直接写文件；命名偏向前端 service 函数的可读性。
+/**
+ * 方法名用于草稿预览，不直接写文件。
+ * 命名偏向前端 service 函数的可读性，后续落地时仍应结合真实资源名和团队规范人工调整。
+ */
 const verbByMethod: Record<(typeof HTTP_METHODS)[number], string> = {
   get: "list",
   post: "create",
@@ -128,6 +135,7 @@ const collectWarnings = (document: OpenApiDocument) => {
   if (document.servers?.some((server) => Boolean(server.url))) {
     warnings.push("检测到 servers.url，请在公开文档或 Demo 中使用脱敏占位值。");
   }
+  // 草稿生成保持只读，是为了避免把用户粘贴的 schema 直接变成仓库文件或远程副作用。
   warnings.push("草稿仅用于预览和人工确认，不会自动写入文件或执行远程脚本。");
   return warnings;
 };

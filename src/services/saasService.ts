@@ -8,6 +8,10 @@ export interface GetSaasParams {
   tenantId?: string;
 }
 
+/**
+ * SaaS 服务只负责前端展示套餐、配额和模块开关入口。
+ * 真实计费、授权和租户权益变更不能在前端完成，所以写命令在 Demo 下必须拒绝。
+ */
 const wrapSuccess = <T>(data: T): ApiResponse<T> => ({
   success: true,
   data,
@@ -31,6 +35,7 @@ export const getSaasPlans = async (
 ): Promise<ApiResponse<SaasPlan[]>> => {
   try {
     if (isDemoApiEnabled()) {
+      // 套餐 Demo 数据用于说明 UI 和字段，不代表真实可购买或可授权的计划。
       return wrapSuccess(SAAS_PLANS);
     }
     const result = await apiClient.get<SaasPlan[]>(
@@ -47,6 +52,7 @@ export const getSaasQuotaUsage = async (
 ): Promise<ApiResponse<SaasQuotaUsage[]>> => {
   try {
     if (isDemoApiEnabled()) {
+      // 配额使用量是静态展示样例，真实环境应由后端按租户实时计算。
       return wrapSuccess(SAAS_QUOTA_USAGE);
     }
     const result = await apiClient.get<SaasQuotaUsage[]>(
@@ -64,6 +70,7 @@ export const updateSaasModuleToggle = async (
 ): Promise<ApiResponse<SaasCommandResult>> => {
   try {
     if (isDemoApiEnabled()) {
+      // 模块开关会改变租户权益，Demo 下不写 localStorage，避免形成假的授权状态。
       return wrapSuccess({ accepted: false, traceId: "demo-saas-module-toggle-disabled" });
     }
     const result = await apiClient.post<SaasCommandResult>(

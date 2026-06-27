@@ -4,6 +4,10 @@ import type { DynamicFormFieldType, DynamicFormPreview, DynamicFormSchema } from
 import { apiClient } from "./apiClient";
 import { isDemoApiEnabled } from "./demoApi";
 
+/**
+ * 动态表单字段类型使用显式白名单。
+ * 新增字段类型时必须先在这里登记，再补对应渲染组件和校验规则，避免 schema 随意扩张。
+ */
 export const DYNAMIC_FORM_FIELD_TYPES: DynamicFormFieldType[] = [
   "text",
   "textarea",
@@ -43,6 +47,10 @@ export const validateDynamicFormSchema = (schema: DynamicFormSchema): DynamicFor
     if (!DYNAMIC_FORM_FIELD_TYPES.includes(field.type)) {
       issues.push(`field ${field.key} 使用了不允许的字段类型 ${field.type}`);
     }
+    /**
+     * linkage 当前只作为声明式联动配置展示，不能执行任意 JS。
+     * 这里用保守关键词拦截高风险表达式，后续若要支持复杂联动，应接入受限表达式解析器。
+     */
     if (field.linkage && /\b(window|document|eval|Function|return)\b/.test(field.linkage)) {
       issues.push(`field ${field.key} 不允许执行任意 JavaScript 表达式`);
     }
@@ -57,6 +65,7 @@ export const getDynamicFormSchemas = async (
   params: DynamicFormQueryParams = {}
 ): Promise<ApiResponse<DynamicFormSchema[]>> => {
   try {
+    // Demo schema 是静态样例，目的是验证渲染边界，而不是让前端成为表单设计器后端。
     if (isDemoApiEnabled()) return wrapSuccess(DYNAMIC_FORM_SCHEMAS);
     const query = queryString(params);
     const path = query ? `/api/dynamic-forms/schemas?${query}` : "/api/dynamic-forms/schemas";
@@ -72,6 +81,7 @@ export const previewDynamicFormSchema = async (
 ): Promise<ApiResponse<DynamicFormPreview>> => {
   try {
     if (isDemoApiEnabled()) {
+      // 预览只返回是否可渲染和字段数量，不在 Demo 中执行 schema 保存或发布。
       const schema = DYNAMIC_FORM_SCHEMAS.find((item) => item.id === schemaId);
       return wrapSuccess({ renderable: Boolean(schema), fieldCount: schema?.fields.length ?? 0, traceId: "demo-form-preview" });
     }

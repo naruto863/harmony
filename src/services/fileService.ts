@@ -45,6 +45,10 @@ export interface FilePreviewUrl {
   reason?: string;
 }
 
+/**
+ * 文件服务当前完全走外部 API，不做本地 Demo 文件系统。
+ * 这样可以避免浏览器 object URL 或 localStorage 被误当成可持久化文件存储。
+ */
 const wrapSuccess = <T>(data: T): ApiResponse<T> => ({
   success: true,
   data,
@@ -63,6 +67,7 @@ const wrapError = (message: string, error?: unknown): ApiResponse<never> => ({
 
 const MAX_PAGE_SIZE = 100;
 
+// 文件列表和统计都限制单次 pageSize，防止大目录一次性拉取过多元数据。
 const resolvePageSize = (pageSize: number | undefined, fallback: number) => {
   return Math.min(Math.max(pageSize ?? fallback, 1), MAX_PAGE_SIZE);
 };
@@ -71,6 +76,7 @@ export const getFiles = async (params: GetFilesParams): Promise<ApiResponse<File
   try {
     const query = new URLSearchParams();
     query.set("tenantId", params.tenantId);
+    // parentId=null 表示根目录；undefined 表示调用方没有声明目录过滤意图。
     if (params.parentId !== undefined) query.set("parentId", params.parentId ?? "");
     query.set("page", String(params.page || 1));
     query.set("size", String(resolvePageSize(params.pageSize, 20)));
@@ -102,6 +108,7 @@ export const getUploadPolicy = async (params: {
   parentId?: string | null;
 }): Promise<ApiResponse<UploadPolicy>> => {
   try {
+    // 上传策略由后端返回，前端只展示和预校验，不在浏览器硬编码租户配额。
     const query = new URLSearchParams();
     query.set("tenantId", params.tenantId);
     if (params.parentId !== undefined) query.set("parentId", params.parentId ?? "");
@@ -114,6 +121,7 @@ export const getUploadPolicy = async (params: {
 
 export const getFileDownloadUrl = async (fileId: string): Promise<ApiResponse<FileAccessUrl>> => {
   try {
+    // 下载链接通常是短期签名 URL，页面只消费结果，不拼接真实存储地址。
     const result = await apiClient.get<FileAccessUrl>(`/api/files/${fileId}/download-url`);
     return wrapSuccess(result);
   } catch (error) {
@@ -123,6 +131,7 @@ export const getFileDownloadUrl = async (fileId: string): Promise<ApiResponse<Fi
 
 export const getFilePreviewUrl = async (fileId: string): Promise<ApiResponse<FilePreviewUrl>> => {
   try {
+    // 预览能力由后端按 MIME 类型、权限和转码状态决定，前端不猜测可预览性。
     const result = await apiClient.get<FilePreviewUrl>(`/api/files/${fileId}/preview-url`);
     return wrapSuccess(result);
   } catch (error) {
@@ -131,11 +140,13 @@ export const getFilePreviewUrl = async (fileId: string): Promise<ApiResponse<Fil
 };
 
 export const getFolderPath = async (_folderId?: string | null): Promise<ApiResponse<FileItem[]>> => {
+  // 面包屑路径暂未接入外部 API，返回空数组让页面降级展示当前目录。
   return wrapSuccess([]);
 };
 
 export const createFolder = async (data: { name: string; parentId: string | null; tenantId: string; userId: string; userName: string }): Promise<ApiResponse<FileItem>> => {
   try {
+    // userId/userName 保留在入参中兼容旧页面形态，真实创建者以后端 token 解析为准。
     const response = await apiClient.post<FileItem>(`/api/files/folders?tenantId=${data.tenantId}`, {
       name: data.name,
       parentId: data.parentId,
@@ -148,6 +159,7 @@ export const createFolder = async (data: { name: string; parentId: string | null
 
 export const uploadFile = async (data: { file: File; parentId: string | null; tenantId: string; userId: string; userName: string }): Promise<ApiResponse<FileItem>> => {
   try {
+    // 文件内容必须通过 multipart 上传；不要把 File 转成 base64 放入 JSON 请求体。
     const response = await apiClient.upload<FileItem>(
       `/api/files/upload?tenantId=${data.tenantId}&parentId=${data.parentId ?? ""}`,
       data.file
@@ -159,10 +171,12 @@ export const uploadFile = async (data: { file: File; parentId: string | null; te
 };
 
 export const renameFile = async (): Promise<ApiResponse<FileItem>> => {
+  // 占位接口用于页面能力矩阵；真实重命名 API 未约定前保持显式未实现。
   return wrapError("未实现");
 };
 
 export const moveFile = async (): Promise<ApiResponse<FileItem>> => {
+  // 移动文件涉及目标目录权限和冲突处理，不能在前端用列表重排模拟。
   return wrapError("未实现");
 };
 
@@ -177,6 +191,7 @@ export const deleteFile = async (fileId: string): Promise<ApiResponse<void>> => 
 
 export const batchDeleteFiles = async (fileIds: string[]): Promise<ApiResponse<void>> => {
   try {
+    // 当前后端契约没有批量删除接口时逐个删除；任何一个失败都让页面按失败处理。
     await Promise.all(fileIds.map((id) => apiClient.delete<void>(`/api/files/${id}`)));
     return wrapSuccess(undefined);
   } catch (error) {
@@ -185,11 +200,13 @@ export const batchDeleteFiles = async (fileIds: string[]): Promise<ApiResponse<v
 };
 
 export const getFileById = async (): Promise<ApiResponse<FileItem>> => {
+  // 详情读取暂未纳入当前页面流程，避免提供一个半真半假的本地查找实现。
   return wrapError("未实现");
 };
 
 export const getStorageStats = async (tenantId: string): Promise<ApiResponse<{ used: number; total: number; fileCount: number; folderCount: number }>> => {
   try {
+    // 这是轻量概览：基于第一页最多 100 条文件元数据估算，不替代后端真实容量统计。
     const result = await getFiles({ tenantId, page: 1, pageSize: MAX_PAGE_SIZE });
     if (!result.success || !result.data) {
       return wrapError("加载统计失败");
@@ -205,6 +222,7 @@ export const getStorageStats = async (tenantId: string): Promise<ApiResponse<{ u
 };
 
 export const formatFileSize = (bytes: number): string => {
+  // 只负责展示单位换算，不做配额或二进制/十进制口径决策。
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
@@ -213,6 +231,7 @@ export const formatFileSize = (bytes: number): string => {
 };
 
 export const getFileIconType = (file: FileItem): string => {
+  // 图标类型是 UI 提示，不作为文件安全判断；下载/预览权限仍以后端结果为准。
   if (file.isFolder) return "folder";
   const type = file.type.toLowerCase();
   if (type.startsWith("image/")) return "image";

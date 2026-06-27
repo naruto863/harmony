@@ -128,7 +128,7 @@ const RealTimeLineChart: React.FC<{
   );
 };
 
-// 地域分布图（模拟）
+// 地域分布图是固定样例数据，用于校验大屏布局和图表配色，不代表真实用户地域统计。
 const RegionDistribution: React.FC = () => {
   const data = [
     { name: '华东', value: 4500, color: 'hsl(var(--primary))' },
@@ -188,7 +188,7 @@ const RegionDistribution: React.FC = () => {
   );
 };
 
-// 实时事件流
+// 实时事件流是前端随机生成的演示流，真实事件应来自审计/消息/业务事件接口。
 const EventStream: React.FC = () => {
   const [events, setEvents] = useState<Array<{
     id: number;
@@ -206,6 +206,7 @@ const EventStream: React.FC = () => {
       signup: ['新用户注册', '邀请注册', '第三方注册'],
     };
 
+    // 每 3 秒插入一条本地事件，只保留最近 8 条，避免长时间打开大屏导致数组无限增长。
     const interval = setInterval(() => {
       const type = eventTypes[Math.floor(Math.random() * eventTypes.length)];
       const messages = eventMessages[type];
@@ -262,7 +263,7 @@ const EventStream: React.FC = () => {
   );
 };
 
-// 服务状态
+// 服务状态同样是静态样例；真实健康状态请走 monitoringService/getMonitoringHealth。
 const ServiceStatus: React.FC = () => {
   const services = [
     { name: 'API 网关', status: 'healthy', latency: 12 },
@@ -311,6 +312,7 @@ export const DataScreenPage: React.FC = () => {
   });
 
   const toggleFullscreen = () => {
+    // Fullscreen API 可能被浏览器策略拒绝；当前页面只同步 UI 状态，不把失败视为业务错误。
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
       setIsFullscreen(true);
@@ -324,6 +326,7 @@ export const DataScreenPage: React.FC = () => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
+    // 监听浏览器原生 fullscreenchange，处理用户按 Esc 退出后按钮状态不同步的问题。
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);

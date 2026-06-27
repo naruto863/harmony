@@ -14,14 +14,21 @@ export interface ModuleManifest {
   key: string;
   name: string;
   version: string;
+  /** 模块实际拥有的页面路由，必须先在 DECLARED_MODULE_ROUTES 白名单中登记。 */
   routes: ModuleRouteManifest[];
+  /** 模块贡献给菜单系统的入口，permission 必须能在 permissions 中找到。 */
   menuItems: ModuleMenuManifest[];
+  /** 前端可识别的权限码声明，不替代后端 RBAC 权限模型。 */
   permissions: string[];
   dictGroups: string[];
+  /** 模块会产生或订阅的审计事件名，用于文档和接入检查。 */
   auditEvents: string[];
   featureFlag?: string;
+  /** 模块对应的外部 API 命名空间，便于网关、Mock 和契约文档统一治理。 */
   apiPrefixes: string[];
+  /** Demo 能力边界，说明哪些展示只是样例、哪些动作必须由真实 API 承接。 */
   demoBoundary: string;
+  /** 当前仓库保持纯前端静态构建，remoteRuntime/remoteEntry 只能显式为 false/空。 */
   remoteRuntime?: boolean;
   remoteEntry?: string;
 }
@@ -157,6 +164,8 @@ export const validateModuleManifest = (
     }
   });
 
+  // 这里只校验 manifest 自洽性，不检查后端接口是否已经真实存在。
+  // 接口可用性应由 API contract 测试或集成环境验证承担。
   return {
     valid: issues.length === 0,
     issues,

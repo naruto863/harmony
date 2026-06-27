@@ -11,14 +11,22 @@ import {
 import { demoStorageKey, isDemoModeEnabled, requireDemoMode } from '@/lib/demoMode';
 import { ApiError, apiClient } from './apiClient';
 
-// 模拟延迟
+/**
+ * 导入导出服务同时保留两条链路：
+ * - 任务 API 链路：createImportTaskFromFile/createExportTask 等，面向真实后端任务引擎。
+ * - 旧版本地 CSV 链路：importUsers/importProjects/importRoles/exportUsers 等，仅用于 Demo 预览。
+ *
+ * 维护时不要把旧版本地 CSV 链路扩展成生产能力；正式导入导出必须通过任务 API 承接权限、
+ * 文件存储、异步执行、错误报告和审计。
+ */
+// 本地 CSV Demo 操作的交互延迟，不用于真实任务 API。
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// 导出类型
+// 当前模板和旧版本地导出只覆盖 CSV，Excel 等格式应走新的任务 API 设计。
 export type ExportFormat = 'csv';
 export type ExportEntityType = 'users' | 'projects' | 'roles';
 
-// 导入结果
+// 旧版本地导入的即时校验结果；真实任务结果请使用 ImportExportTask。
 export interface ImportResult {
   success: number;
   failed: number;
@@ -464,7 +472,7 @@ const ROLE_TEMPLATE_EXAMPLE = [
   ['自定义角色2', '另一个自定义角色', 'users:read,users:create,users:update'],
 ];
 
-// 下载模板
+// 模板下载仍是纯前端 CSV 生成，不需要后端任务；它只提供字段示例，不代表最终导入规则。
 export const downloadTemplate = async (
   entityType: ExportEntityType,
   _format: ExportFormat = 'csv'
@@ -497,7 +505,7 @@ export const downloadTemplate = async (
   downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8');
 };
 
-// 导出用户
+// 旧版本地导出用户：用于 Demo 页面快速下载当前表格数据，生产导出应走 createExportTask。
 export const exportUsers = async (
   users: User[],
   _format: ExportFormat = 'csv'
@@ -520,7 +528,7 @@ export const exportUsers = async (
   downloadFile(csv, `用户列表_${dateStr}.csv`, 'text/csv;charset=utf-8');
 };
 
-// 导出项目
+// 旧版本地导出项目：不做权限、脱敏或审计，调用方只能在 Demo/本地预览中使用。
 export const exportProjects = async (
   projects: Project[],
   _format: ExportFormat = 'csv'
@@ -547,7 +555,7 @@ export const exportProjects = async (
   downloadFile(csv, `项目列表_${dateStr}.csv`, 'text/csv;charset=utf-8');
 };
 
-// 导出角色
+// 旧版本地导出角色：角色权限信息较敏感，真实导出必须由后端判断字段范围。
 export const exportRoles = async (
   roles: Role[],
   _format: ExportFormat = 'csv'
@@ -571,7 +579,7 @@ export const exportRoles = async (
   downloadFile(csv, `角色列表_${dateStr}.csv`, 'text/csv;charset=utf-8');
 };
 
-// 导入用户
+// 旧版本地导入用户：仅写入 Demo localStorage，用于预览逐行校验和错误汇总。
 export const importUsers = async (
   file: File,
   tenantId: string
@@ -642,7 +650,7 @@ export const importUsers = async (
   return result;
 };
 
-// 导入项目
+// 旧版本地导入项目：只覆盖最小字段映射，不处理负责人、权限和复杂状态流转。
 export const importProjects = async (
   file: File,
   tenantId: string
@@ -701,7 +709,7 @@ export const importProjects = async (
   return result;
 };
 
-// 导入角色
+// 旧版本地导入角色：只允许 Demo 模式，避免生产环境绕过角色权限审计。
 export const importRoles = async (
   file: File,
   tenantId: string
@@ -763,7 +771,7 @@ export const importRoles = async (
   return result;
 };
 
-// 验证导入文件
+// 前端预校验只挡明显错误，正式导入仍要以后端文件扫描和任务校验结果为准。
 export const validateImportFile = (file: File): { valid: boolean; error?: string } => {
   const maxSize = 10 * 1024 * 1024; // 10MB
   

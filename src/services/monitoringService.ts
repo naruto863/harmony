@@ -36,6 +36,10 @@ export interface MonitoringAlertCommandOptions {
 
 const MAX_PAGE_SIZE = 100;
 
+/**
+ * 监控服务只做前端适配：读接口返回健康/告警数据，写接口返回命令受理结果。
+ * 真实指标采集、告警状态机和审计落点都应在外部监控 API 中完成。
+ */
 const wrapSuccess = <T>(data: T): ApiResponse<T> => ({
   success: true,
   data,
@@ -48,10 +52,15 @@ const wrapError = (message: string): ApiResponse<never> => ({
 
 const resolvePage = (page?: number) => Math.max(page ?? 1, 1);
 
+// 告警历史可能增长很快，前端先限制 pageSize，避免误把全量日志拉到浏览器。
 const resolvePageSize = (pageSize?: number, fallback = 20) => {
   return Math.min(Math.max(pageSize ?? fallback, 1), MAX_PAGE_SIZE);
 };
 
+/**
+ * 统一把后端 list/total/page/size 转为页面使用的 data/meta。
+ * 这样监控页和其他列表页可以共享同一套分页展示逻辑。
+ */
 const toPagedResponse = <T>(payload: MonitoringListPayload<T>): ApiResponse<T[]> => ({
   success: true,
   data: payload.list,
@@ -94,6 +103,7 @@ export const getMonitoringHealth = async (
 ): Promise<ApiResponse<MonitoringHealthSummary>> => {
   try {
     if (isDemoApiEnabled()) {
+      // Demo 健康状态是固定样例，不连接任何真实探针或指标采集端。
       return wrapSuccess(MONITORING_HEALTH);
     }
     const query = buildHealthQuery(params);
@@ -112,6 +122,7 @@ export const getMonitoringAlerts = async (
     const page = resolvePage(params.page);
     const size = resolvePageSize(params.pageSize);
     if (isDemoApiEnabled()) {
+      // Demo 告警只支持本地筛选分页，便于验证 UI 空间和状态标签。
       const filtered = MONITORING_ALERTS.filter((alert) => {
         if (params.status && alert.status !== params.status) return false;
         if (params.severity && alert.severity !== params.severity) return false;
@@ -134,6 +145,7 @@ export const acknowledgeMonitoringAlert = async (
 ): Promise<ApiResponse<MonitoringCommandResult>> => {
   try {
     if (isDemoApiEnabled()) {
+      // 告警确认会改变真实告警状态并需要审计，Demo 下只返回未受理结果。
       return wrapSuccess({ accepted: false, traceId: "demo-monitoring-ack-disabled" });
     }
     const result = await apiClient.post<MonitoringCommandResult>(
@@ -152,6 +164,7 @@ export const resolveMonitoringAlert = async (
 ): Promise<ApiResponse<MonitoringCommandResult>> => {
   try {
     if (isDemoApiEnabled()) {
+      // 解决告警需要后端校验当前状态，不能用本地数组假装完成。
       return wrapSuccess({ accepted: false, traceId: "demo-monitoring-resolve-disabled" });
     }
     const result = await apiClient.post<MonitoringCommandResult>(
@@ -170,6 +183,7 @@ export const silenceMonitoringAlert = async (
 ): Promise<ApiResponse<MonitoringCommandResult>> => {
   try {
     if (isDemoApiEnabled()) {
+      // 静默策略会影响后续告警通知范围，Demo 不持久化这类运维动作。
       return wrapSuccess({ accepted: false, traceId: "demo-monitoring-silence-disabled" });
     }
     const result = await apiClient.post<MonitoringCommandResult>(

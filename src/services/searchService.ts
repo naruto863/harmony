@@ -19,7 +19,11 @@ export interface SearchResponse {
   total: number;
 }
 
-// 搜索所有模块
+/**
+ * 全局搜索当前是前端聚合搜索：
+ * 用户、项目和审计日志来自 mock-data，文件结果通过 fileService 拉取当前租户列表后再过滤。
+ * 它适合 Demo 和轻量预览，不等价于生产搜索引擎或后端全文检索能力。
+ */
 export const globalSearch = async (
   query: string,
   tenantId: string,
@@ -39,7 +43,7 @@ export const globalSearch = async (
   const types = options?.types || ['user', 'project', 'file', 'log'];
   const results: SearchResult[] = [];
 
-  // 搜索用户
+  // 用户 mock 数据没有 tenantId 字段，真实租户隔离应由后端搜索接口处理。
   if (types.includes('user')) {
     const userResults = USERS
       .filter(user => 
@@ -60,7 +64,7 @@ export const globalSearch = async (
     results.push(...userResults);
   }
 
-  // 搜索项目
+  // 项目和审计日志在 mock 数据中有 tenantId，可以在前端做最小隔离过滤。
   if (types.includes('project')) {
     const projectResults = PROJECTS
       .filter(project => 
@@ -82,7 +86,7 @@ export const globalSearch = async (
     results.push(...projectResults);
   }
 
-  // 搜索文件
+  // 文件搜索复用文件列表接口，只过滤当前页可见文件；大规模文件检索应接入后端搜索。
   if (types.includes('file')) {
     const filesResponse = await getFiles({ tenantId });
     const allFiles = filesResponse.data || [];
@@ -103,7 +107,7 @@ export const globalSearch = async (
     results.push(...fileResults);
   }
 
-  // 搜索审计日志
+  // 审计日志搜索仅覆盖前端样例字段，真实审计检索应支持时间、动作、资源等服务端索引。
   if (types.includes('log')) {
     const logResults = AUDIT_LOGS
       .filter(log => 
@@ -131,7 +135,10 @@ export const globalSearch = async (
   };
 };
 
-// 获取最近访问的项目
+/**
+ * 最近访问当前用项目更新时间近似。
+ * 如果后续需要真实“最近访问”，应新增访问日志或用户行为接口，而不是继续复用 updatedAt。
+ */
 export const getRecentItems = async (tenantId: string): Promise<SearchResult[]> => {
   await new Promise(resolve => setTimeout(resolve, 50));
   

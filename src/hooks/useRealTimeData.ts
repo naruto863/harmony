@@ -54,6 +54,11 @@ const metricConfigs = {
   queue_length: { base: 10, variance: 8 },
 };
 
+/**
+ * 大屏/监控的本地实时数据 Hook。
+ * 它用定时器生成演示指标，不建立 WebSocket、SSE 或轮询后端连接；
+ * 接入真实监控时应保留返回形态，替换数据来源和连接生命周期即可。
+ */
 export const useRealTimeData = (config: RealTimeDataConfig = {}) => {
   const { updateInterval = 2000, enabled = true } = config;
   const [metrics, setMetrics] = useState<RealTimeMetric[]>(initialMetrics);
@@ -153,6 +158,9 @@ export const useRealTimeChartData = (
   /**
    * 图表层维护自己的滑动窗口，而不是复用 metrics 数组。
    * maxPoints 控制最多保留多少个点，避免长时间打开页面后数组无限增长。
+   *
+   * 注意：这里的 interval 是为了采样当前 Hook 中的演示指标；
+   * 真实接入时更推荐由数据源推送时间点，避免多个图表各自创建独立采样节奏。
    */
   useEffect(() => {
     const interval = setInterval(() => {
